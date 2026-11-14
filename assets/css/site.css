@@ -30,11 +30,11 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .landing{position:relative;min-height:100vh;min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;color:var(--on-photo);isolation:isolate;overflow:hidden;background:#2e2452}
 .landing::before{content:"";position:absolute;inset:0;z-index:-3;background:#3a3156 url(../img/bg-dusk.jpg) 42% 30%/cover no-repeat}
 .slides{position:absolute;inset:0;z-index:-2;pointer-events:none}
-.slides span{position:absolute;inset:0;background:center/cover no-repeat;opacity:0;animation:slide 40s infinite}
+.slides span{position:absolute;inset:0;background:center/cover no-repeat;opacity:0;animation:slide 20s infinite}
 .slides span:nth-child(1){background-image:url(../img/bg-dusk.jpg);background-position:42% 30%;animation-delay:0s}
-.slides span:nth-child(2){background-image:url(../img/bg-2.jpg);background-position:40% 60%;animation-delay:10s}
-.slides span:nth-child(3){background-image:url(../img/bg-3.jpg);background-position:50% 55%;animation-delay:20s}
-.slides span:nth-child(4){background-image:url(../img/bg-4.jpg);background-position:50% 35%;animation-delay:30s}
+.slides span:nth-child(2){background-image:url(../img/bg-2.jpg);background-position:40% 60%;animation-delay:5s}
+.slides span:nth-child(3){background-image:url(../img/bg-3.jpg);background-position:50% 55%;animation-delay:10s}
+.slides span:nth-child(4){background-image:url(../img/bg-4.jpg);background-position:50% 35%;animation-delay:15s}
 .slides span:nth-child(1){opacity:1}
 @keyframes slide{0%{opacity:0}4%{opacity:1}25%{opacity:1}29%{opacity:0}100%{opacity:0}}
 .slides span:nth-child(1){animation-name:slide1}
