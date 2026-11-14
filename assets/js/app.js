@@ -236,10 +236,27 @@ async function initGate() {
     } catch { say($('#pwStatus'), 'Wrong password. Check with the organizer.', 'err'); }
   });
 }
+// One signature per device counts for every page. Older per-page signatures are picked up too.
+function getSigned(v) {
+  for (const k of ['stray-w', 'stray-w-' + PAGE, 'stray-w-runners', 'stray-w-relay', 'stray-w-crew']) { const r = store.get(k); if (r && r.v === v) return r; }
+  return null;
+}
+function saveSigned(rec) { store.set('stray-w', rec); store.set('stray-w-' + PAGE, rec); }
+function waiverBody(rec) {
+  const tmp = document.createElement('div'); tmp.innerHTML = PRIV.html;
+  const wt = $('#waiverText');
+  return { type: 'waiver', key: PRIV.key, page: PAGE, version: PRIV.waiverVersion, name: rec.name, email: rec.email, role: rec.role, signature: rec.signature, date: rec.date, copyTo: PRIV.copyTo, waiverHtml: wt ? wt.innerHTML : '', packHtml: buildPack(rec.role, tmp), ua: navigator.userAgent.slice(0, 120), lang: LANG };
+}
+// A signature made before the backend was connected is sent once, in the background. No re-signing.
+function syncSigned(rec) {
+  if (!PRIV.endpoint || rec.synced) return;
+  const body = waiverBody(rec);
+  post(body).then(r => { if (r && r.ok) { rec.synced = true; saveSigned(rec); } }).catch(() => { });
+}
 function afterDecrypt(p) {
   PRIV = p.data; PRIV.html = p.html; addDict(PRIV.i18n);
-  const signed = store.get('stray-w-' + PAGE);
-  if (signed && signed.v === PRIV.waiverVersion) return reveal(signed);
+  const signed = getSigned(PRIV.waiverVersion);
+  if (signed) { syncSigned(signed); return reveal(signed); }
   $('#gatePw').hidden = true; $('#gateWaiver').hidden = false;
   const sel = $('#wWho'); (PRIV.roster || []).concat('Other').forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.appendChild(o); });
   $('#wDate').value = new Date().toLocaleDateString(LOCALE[LANG], { day: '2-digit', month: 'long', year: 'numeric' });
@@ -263,18 +280,17 @@ async function submitWaiver(e) {
   const rec = { name: $('#wName').value.trim(), email: $('#wEmail').value.trim(), role: $('#wWho').value, signature: $('#wSig').value.trim(), date: $('#wDate').value, v: PRIV.waiverVersion, t: now() };
   if (!$('#wAccept').checked) return say(st, 'Tick the box to accept the terms.', 'err');
   if (rec.signature.toLowerCase().replace(/\s+/g, ' ') !== rec.name.toLowerCase().replace(/\s+/g, ' ')) return say(st, 'Type your full name exactly as above to sign.', 'err');
-  const tmp = document.createElement('div'); tmp.innerHTML = PRIV.html;
-  const body = { type: 'waiver', key: PRIV.key, page: PAGE, version: PRIV.waiverVersion, ...rec, copyTo: PRIV.copyTo, waiverHtml: $('#waiverText').innerHTML, packHtml: buildPack(rec.role, tmp), ua: navigator.userAgent.slice(0, 120), lang: LANG };
+  const body = waiverBody(rec);
   const btn = $('button[type=submit]', f); btn.disabled = true;
   if (!PRIV.endpoint) {
     say(st, 'Signed. Note: the email backend is not connected yet, so no email was sent. Your signature is saved on this device.', 'ok');
-    store.set('stray-w-' + PAGE, rec); setTimeout(() => reveal(rec), 1400); return;
+    saveSigned(rec); setTimeout(() => reveal(rec), 1400); return;
   }
   say(st, 'Sending your waiver and race pack…');
   try {
     const r = await post(body);
     if (!r || !r.ok) throw new Error(r && r.error || 'Server error');
-    store.set('stray-w-' + PAGE, rec);
+    rec.synced = true; saveSigned(rec);
     say(st, `<span>Signed. A copy and your race pack are on their way to</span> <b>${esc(rec.email)}</b> <span>and to the organizer.</span>`, 'ok');
     setTimeout(() => reveal(rec), 1400);
   } catch (err) { btn.disabled = false; say(st, '<span>Could not send. Check your connection and try again.</span> <small>(' + esc(err.message) + ')</small>', 'err'); }
