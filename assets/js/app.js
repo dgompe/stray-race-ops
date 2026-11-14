@@ -500,7 +500,7 @@ function renderDash() {
   $('#alerts').innerHTML = A.length ? A.map(([c, m]) => `<li class="${c}">${m}</li>`).join('') : '<li class="note">No alerts.</li>';
   // forms + waivers
   const fs = $('#formsStatus'); if (fs) fs.innerHTML = PRIV.runners.map(r => { const ok = REMOTE && REMOTE.forms && REMOTE.forms.includes(r); return `<span class="${REMOTE ? (ok ? 'yes' : 'no') : ''}" title="${ok ? 'form received' : 'missing'}">${r}${REMOTE ? (ok ? ' ✓' : '') : ''}</span>`; }).join('') + (REMOTE ? '' : '<p class="note">Connect the backend to see which forms arrived.</p>');
-  renderPeople();
+  renderPeople(); bcCount();
   const wc = $('#waiverCount'); if (wc) wc.textContent = REMOTE && REMOTE.waivers != null ? `${REMOTE.waivers.total} total · ${REMOTE.waivers.runners} runners · ${REMOTE.waivers.relay} relay · ${REMOTE.waivers.crew} crew` : '—';
 }
 
@@ -523,6 +523,43 @@ function renderPeople() {
   if (REMOTE) { $('#pSigned').textContent = s; $('#pMissing').textContent = m; $('#pForms').textContent = f + '/' + PRIV.runners.length; const nt = $('#pNote'); if (nt) nt.hidden = true; }
   tb.dataset.missing = missing.join(', ');
 }
+
+const TPL = {
+  start: ['Race starts Saturday 28.11 at 11:00', 'Hi all,\n\nQuick reminder before race day:\n- Start: Saturday 28.11, 11:00 at IMD Lausanne. Finish Sunday 29.11, 12:34 at IMD.\n- Your section, start time, station and ride are on your personal card (in the email you got when you signed, or on the race page).\n- Departure times are hard times.\n- Reflective vest and headlamp are mandatory in the dark.\n- Bring ID or passport: the route crosses into France.\n- Sleeping in a van? Bring a sleeping bag. Airbnb? Bring your own towel.\n\nSee you at the lake!\nDavid'],
+  change: ['Schedule change', 'Hi all,\n\nSchedule change: [what changed].\nNew time: [time] at [station].\nEverything else stays the same.\n\nDavid'],
+  weather: ['Weather update for race day', 'Hi all,\n\nWeather for race day: [forecast].\nPlease bring [warm layers / rain jacket / gloves].\n\nDavid'],
+};
+function bcCount() {
+  const el = $('#bcCount'); if (!el) return;
+  if (!REMOTE) { el.textContent = 'Connecting to the backend…'; return; }
+  const aud = $('#bcAud').value, rows = (REMOTE.signed || []).filter(x => aud === 'all' || x.page === aud);
+  const n = new Set(rows.map(x => normName(x.name) + '|' + normName(x.role))).size;
+  el.textContent = `About ${n} people will receive it.` + (REMOTE.quota != null ? ` Emails left today: ${REMOTE.quota}.` : '');
+}
+function initBroadcast() {
+  const f = $('#bcForm'); if (!f) return;
+  $$('[data-tpl]', f).forEach(b => b.addEventListener('click', () => { const t = TPL[b.dataset.tpl]; $('#bcSubj').value = t[0]; $('#bcMsg').value = t[1]; }));
+  $('#bcAud').addEventListener('change', bcCount);
+  const st = $('#bcStatus'), go = $('#bcGo'), ok = $('#bcConfirm'), no = $('#bcCancel');
+  const reset = () => { go.hidden = false; ok.hidden = true; no.hidden = true; };
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!PRIV.endpoint) return say(st, 'The backend is not connected yet.', 'err');
+    bcCount(); go.hidden = true; ok.hidden = false; no.hidden = false;
+    say(st, 'Check the text, then press “Confirm: send now”. Emails cannot be recalled.');
+  });
+  no.addEventListener('click', () => { reset(); st.hidden = true; });
+  ok.addEventListener('click', async () => {
+    ok.disabled = true; say(st, 'Sending…');
+    try {
+      const r = await post({ type: 'broadcast', key: PRIV.key, admin: PRIV.adminKey, audience: $('#bcAud').value, subject: $('#bcSubj').value.trim(), message: $('#bcMsg').value.trim(), site: new URL('../index.html', location.href).href });
+      if (!r || !r.ok) throw new Error(r && r.error || 'Server error');
+      say(st, `Sent to ${r.sent} people. Emails left today: ${r.quota}.`, 'ok'); if (REMOTE) REMOTE.quota = r.quota; f.reset();
+    } catch (err) { say(st, 'Not sent: ' + esc(err.message), 'err'); }
+    ok.disabled = false; reset();
+  });
+  bcCount();
+}
 function csv() {
   const head = ['id', 'event_time', 'station', 'runner', 'kind', 'value', 'note', 'by', 'logged_at'];
   const rows = EVENTS.slice().sort((a, b) => a.t - b.t).map(e => [e.id, fmt(e.t), e.st, e.r, e.k, e.v || '', (e.note || '').replace(/\n/g, ' '), e.by || '', fmt(e.at || e.t)]);
@@ -539,6 +576,7 @@ function initCrew() {
   $('#csvCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(csv()); say($('#ciStatus'), 'Log copied as CSV.', 'ok'); } catch { say($('#ciStatus'), 'Copy was blocked by the browser.', 'err'); } });
   $('#csvDl').addEventListener('click', e => { const b = new Blob([csv()], { type: 'text/csv' }); e.currentTarget.href = URL.createObjectURL(b); });
   $('#syncNow').addEventListener('click', () => { flush().then(pull); });
+  initBroadcast();
   $('#pOnlyMissing').addEventListener('click', e => { onlyMissing = !onlyMissing; e.currentTarget.classList.toggle('on', onlyMissing); renderPeople(); });
   $('#pCopyMissing').addEventListener('click', async () => { const t = $('#peopleTbl tbody').dataset.missing || ''; try { await navigator.clipboard.writeText(t); say($('#ciStatus'), 'Log copied as CSV.'.replace('Log copied as CSV.', 'Names copied.'), 'ok'); } catch { } });
   if (PRIV.poltrax) { const box = $('#dashPoltrax'); box.hidden = false; box.innerHTML = `<iframe src="${esc(PRIV.poltrax)}" title="Live tracking" loading="lazy"></iframe>`; }
