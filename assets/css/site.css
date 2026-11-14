@@ -28,7 +28,18 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 
 /* ---------- Landing (dusk photo on every page) ---------- */
 .landing{position:relative;min-height:100vh;min-height:100svh;display:grid;grid-template-rows:auto 1fr auto;color:var(--on-photo);isolation:isolate;overflow:hidden;background:#2e2452}
-.landing::before{content:"";position:absolute;inset:0;z-index:-2;background:#3a3156 url(../img/bg-dusk.jpg) 42% 30%/cover no-repeat}
+.landing::before{content:"";position:absolute;inset:0;z-index:-3;background:#3a3156 url(../img/bg-dusk.jpg) 42% 30%/cover no-repeat}
+.slides{position:absolute;inset:0;z-index:-2;pointer-events:none}
+.slides span{position:absolute;inset:0;background:center/cover no-repeat;opacity:0;animation:slide 40s infinite}
+.slides span:nth-child(1){background-image:url(../img/bg-dusk.jpg);background-position:42% 30%;animation-delay:0s}
+.slides span:nth-child(2){background-image:url(../img/bg-2.jpg);background-position:40% 60%;animation-delay:10s}
+.slides span:nth-child(3){background-image:url(../img/bg-3.jpg);background-position:50% 55%;animation-delay:20s}
+.slides span:nth-child(4){background-image:url(../img/bg-4.jpg);background-position:50% 35%;animation-delay:30s}
+.slides span:nth-child(1){opacity:1}
+@keyframes slide{0%{opacity:0}4%{opacity:1}25%{opacity:1}29%{opacity:0}100%{opacity:0}}
+.slides span:nth-child(1){animation-name:slide1}
+@keyframes slide1{0%{opacity:1}25%{opacity:1}29%{opacity:0}96%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.slides span{animation:none}.slides span:not(:first-child){display:none}}
 .landing::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#1d163ae0 0%,#1d163a99 45%,#1d163a33 100%)}
 .bar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-block:24px 0}
 .brand{display:block;width:clamp(78px,7vw,104px)}.brand img{display:block;width:100%;height:auto}
@@ -75,9 +86,6 @@ h1.big{font-family:var(--st);font-weight:400;text-transform:uppercase;font-size:
 }
 
 /* relay page: track photo band */
-.band{position:relative;height:clamp(240px,52vh,560px);background:#7a1f1f url(../img/bg-track.jpg) center 55%/cover no-repeat;display:flex;align-items:flex-end;padding:24px max(28px,env(safe-area-inset-left,0px))}
-.band::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#1d163ab3,#1d163a00 60%)}
-.band span{position:relative;z-index:1;color:var(--on-photo);font-size:clamp(48px,7vw,110px);line-height:.9}
 
 /* ---------- Content panel ---------- */
 .flow{background:var(--paper);color:var(--ink);position:relative}
