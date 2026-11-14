@@ -32,6 +32,14 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .landing::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#1d163ae0 0%,#1d163a99 45%,#1d163a33 100%)}
 .bar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-block:24px 0}
 .brand{display:block;width:clamp(78px,7vw,104px)}.brand img{display:block;width:100%;height:auto}
+.bar-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ph-r{display:flex;align-items:center;gap:10px}
+.lang{display:flex;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em}
+.lang button{padding:8px 6px;opacity:.55}
+.lang button:hover{opacity:.85}
+.lang button[aria-pressed="true"]{opacity:1;text-decoration:underline;text-underline-offset:4px}
+.p-head .lang{color:var(--ink)}
+@media (max-width:760px){.p-head .lang{display:none}}
 .pages{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 20px}
 .pages a{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;padding:8px 0;border-bottom:1px solid transparent;opacity:.8}
 .pages a:hover,.pages a[aria-current="page"]{opacity:1;border-bottom-color:currentColor}
@@ -52,6 +60,7 @@ h1.big{font-family:var(--st);font-weight:400;text-transform:uppercase;font-size:
 .nav{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .nav a{display:inline-block;font-family:var(--st);text-transform:uppercase;letter-spacing:.02em;font-size:clamp(20px,1.7vw,26px);line-height:1;text-decoration:none;padding:7px 0;border-bottom:1px solid transparent}
 .nav a:hover{border-bottom-color:currentColor}
+.nav a.nav-cta{border-bottom-color:currentColor;margin-top:8px}
 .foot{padding-block:0 18px}
 .head{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid #f6efe955;padding-top:12px}
 .night{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:1px solid currentColor;padding:6px 10px}

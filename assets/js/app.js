@@ -19,6 +19,77 @@ const PAGE = document.body.dataset.page;
 const ST = R.stations, IDX = Object.fromEntries(ST.map((s, i) => [s.id, i]));
 const FIN = ST[ST.length - 1];
 
+/* ---------- i18n: EN · DE · FR · ES ----------
+   Text stays English in the HTML. Every text node is looked up in window.I18N (public)
+   plus the page's private dictionary (inside the encrypted payload) and swapped in place.
+   Times, km, station ids are tokens (#) kept from the original. */
+const LANGS = ['en', 'de', 'fr', 'es'];
+const DICT = Object.assign({}, (window.I18N && window.I18N.d) || {});
+let FRAG = ((window.I18N && window.I18N.f) || []).slice();
+const TOK = /(?:(?:Sat|Sun) )?\d{1,2}:\d\d|\b[AS]\d{1,2}\b|\d+(?:[.,]\d+)?/g;
+const DAYN = { de: { Sat: 'Sa', Sun: 'So' }, fr: { Sat: 'sam.', Sun: 'dim.' }, es: { Sat: 'sáb', Sun: 'dom' } };
+const LOCALE = { en: 'en-GB', de: 'de-CH', fr: 'fr-CH', es: 'es-ES' };
+function pickLang() {
+  const q = (location.search.match(/[?&]lang=(en|de|fr|es)/) || [])[1];
+  const saved = store.get('stray-lang');
+  if (saved && LANGS.includes(saved)) return saved;
+  if (q) return q;
+  const nav = (navigator.languages || [navigator.language || 'en']).map(x => String(x).slice(0, 2).toLowerCase());
+  return nav.find(x => LANGS.includes(x)) || 'en';
+}
+let LANG = pickLang();
+const dayT = tok => LANG === 'en' ? tok : tok.replace(/^(Sat|Sun)\b/, d => DAYN[LANG][d]);
+function tr(s) {
+  if (LANG === 'en' || !s) return s;
+  const core = s.replace(/\s+/g, ' ').trim(); if (!core) return s;
+  const li = LANGS.indexOf(LANG) - 1, toks = [];
+  const key = core.replace(TOK, m => { toks.push(m); return '#'; });
+  const e = DICT[key]; let out;
+  if (e && e[li]) { let i = 0; out = e[li].replace(/#/g, () => i < toks.length ? dayT(toks[i++]) : '#'); }
+  else {
+    out = core;
+    for (const [en, arr] of FRAG) if (out.includes(en)) out = out.split(en).join(arr[li]);
+    out = out.replace(/\b(Sat|Sun) (\d{1,2}:\d\d)/g, (m, d, t) => DAYN[LANG][d] + ' ' + t);
+    if (out === core) return s;
+  }
+  return (s.match(/^\s*/)[0] ? ' ' : '') + out + (s.match(/\s*$/)[0] ? ' ' : '');
+}
+const ORIG = new WeakMap(), MINE = new WeakMap();
+const SKIP = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, CODE: 1 };
+function trText(n) {
+  if (!ORIG.has(n)) ORIG.set(n, n.data);
+  const t = tr(ORIG.get(n));
+  if (n.data !== t) { n.data = t; }
+  MINE.set(n, n.data);
+}
+function trTree(root) {
+  if (!root) return;
+  if (root.nodeType === 3) { if (!(root.parentNode && SKIP[root.parentNode.nodeName])) trText(root); return; }
+  if (root.nodeType !== 1 && root.nodeType !== 11) return;
+  if (SKIP[root.nodeName] || root.id === 'vault') return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => SKIP[n.parentNode.nodeName] || (n.parentNode.closest && n.parentNode.closest('#vault,[data-notr]')) ? 2 : 1 });
+  let n; while ((n = w.nextNode())) trText(n);
+  const els = root.querySelectorAll ? root.querySelectorAll('[placeholder]') : [];
+  els.forEach(el => { if (!el.dataset.ph) el.dataset.ph = el.getAttribute('placeholder'); el.setAttribute('placeholder', tr(el.dataset.ph)); });
+}
+const TITLE0 = document.title;
+function setLang(l) {
+  LANG = LANGS.includes(l) ? l : 'en'; store.set('stray-lang', LANG);
+  document.documentElement.lang = LANG; document.title = tr(TITLE0);
+  $$('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.l === LANG ? 'true' : 'false'));
+  trTree(document.body);
+  const d = document.getElementById('wDate'); if (d) d.value = new Date().toLocaleDateString(LOCALE[LANG], { day: '2-digit', month: 'long', year: 'numeric' });
+}
+new MutationObserver(ms => {
+  for (const m of ms) {
+    if (m.type === 'characterData') { const n = m.target; if (MINE.get(n) !== n.data) { ORIG.set(n, n.data); trText(n); } }
+    else m.addedNodes.forEach(trTree);
+  }
+}).observe(document.body, { childList: true, subtree: true, characterData: true });
+$$('.lang button').forEach(b => b.addEventListener('click', () => setLang(b.dataset.l)));
+setLang(LANG);
+const addDict = d => { if (!d) return; Object.assign(DICT, d.d || {}); FRAG = FRAG.concat(d.f || []).sort((a, b) => b[0].length - a[0].length); trTree(document.body); };
+
 /* ---------- night mode ---------- */
 function setNight(on) {
   document.documentElement.classList.toggle('night', on);
@@ -110,9 +181,9 @@ function tickPublic() {
   const t = now(), p = planAt(t), el = $('#packNow');
   let msg;
   if (p.state === 'pre') msg = `<p class="note">Start Saturday 28.11 at 11:00 at IMD. The map will show where the pack should be.</p>`;
-  else if (p.state === 'stop') msg = `<p>By schedule the pack is <b>at ${esc(p.st.id)}</b> until <b>${hm(p.st.dep)}</b> (hard departure).</p>`;
-  else if (p.state === 'run') msg = `<p>By schedule the pack is on <b>${p.sec}</b>, ${esc(p.from.id === 'START' ? 'IMD' : p.from.id)} → ${esc(p.to.id === 'FIN' ? 'IMD' : p.to.id)}, at about <b>km ${p.km.toFixed(1)}</b>. Next arrival ${hm(p.to.arr)}.</p>`;
-  else msg = `<p>The pack finished at IMD on Sunday at <b>${hm(FIN.arr)}</b>.</p>`;
+  else if (p.state === 'stop') msg = `<p><b>By schedule the pack is at ${esc(p.st.id)} until ${hm(p.st.dep)} (hard departure).</b></p>`;
+  else if (p.state === 'run') msg = `<p><b>By schedule the pack is on ${p.sec}, ${esc(p.from.id === 'START' ? 'IMD' : p.from.id)} → ${esc(p.to.id === 'FIN' ? 'IMD' : p.to.id)}, at about km ${p.km.toFixed(1)}. Next arrival ${hm(p.to.arr)}.</b></p>`;
+  else msg = `<p><b>The pack finished at IMD on Sunday at ${hm(FIN.arr)}.</b></p>`;
   if (el) el.innerHTML = msg;
   const bar = $('#packProg'); if (bar) bar.style.width = (p.km / R.routeKm * 100).toFixed(2) + '%';
   drawMap($('#routeMap'), { doneKm: p.state === 'pre' ? null : p.km, pack: p.state === 'pre' ? null : pointAtKm(p.km) });
@@ -165,12 +236,12 @@ async function initGate() {
   });
 }
 function afterDecrypt(p) {
-  PRIV = p.data; PRIV.html = p.html;
+  PRIV = p.data; PRIV.html = p.html; addDict(PRIV.i18n);
   const signed = store.get('stray-w-' + PAGE);
   if (signed && signed.v === PRIV.waiverVersion) return reveal(signed);
   $('#gatePw').hidden = true; $('#gateWaiver').hidden = false;
   const sel = $('#wWho'); (PRIV.roster || []).concat('Other').forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.appendChild(o); });
-  $('#wDate').value = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  $('#wDate').value = new Date().toLocaleDateString(LOCALE[LANG], { day: '2-digit', month: 'long', year: 'numeric' });
   $('#gateWaiver').scrollIntoView({ block: 'start' });
   $('#waiverForm').addEventListener('submit', submitWaiver);
 }
@@ -181,8 +252,9 @@ function buildPack(role, tmp) {
   if (PRIV.cards && PRIV.cards[role]) h += PRIV.cards[role];
   $$('section.pack, #safety', tmp).forEach(s => { const c = s.cloneNode(true); $$('form,button,select,.picker,.card-slot', c).forEach(x => x.remove()); h += c.innerHTML; });
   const sched = $('.sched'); if (sched) h += '<h2>Hard-time schedule</h2>' + sched.outerHTML;
-  h += `<p>Site: <a href="${location.href.split('#')[0]}">${location.href.split('#')[0]}</a></p>`;
-  return abs(h);
+  h += `<p><span>Site:</span> <a href="${location.href.split('#')[0]}">${location.href.split('#')[0]}</a></p>`;
+  const box = document.createElement('div'); box.innerHTML = h; trTree(box);
+  return abs(box.innerHTML);
 }
 async function submitWaiver(e) {
   e.preventDefault();
@@ -191,10 +263,10 @@ async function submitWaiver(e) {
   if (!$('#wAccept').checked) return say(st, 'Tick the box to accept the terms.', 'err');
   if (rec.signature.toLowerCase().replace(/\s+/g, ' ') !== rec.name.toLowerCase().replace(/\s+/g, ' ')) return say(st, 'Type your full name exactly as above to sign.', 'err');
   const tmp = document.createElement('div'); tmp.innerHTML = PRIV.html;
-  const body = { type: 'waiver', key: PRIV.key, page: PAGE, version: PRIV.waiverVersion, ...rec, copyTo: PRIV.copyTo, waiverHtml: $('#waiverText').innerHTML, packHtml: buildPack(rec.role, tmp), ua: navigator.userAgent.slice(0, 120) };
+  const body = { type: 'waiver', key: PRIV.key, page: PAGE, version: PRIV.waiverVersion, ...rec, copyTo: PRIV.copyTo, waiverHtml: $('#waiverText').innerHTML, packHtml: buildPack(rec.role, tmp), ua: navigator.userAgent.slice(0, 120), lang: LANG };
   const btn = $('button[type=submit]', f); btn.disabled = true;
   if (!PRIV.endpoint) {
-    say(st, 'Signed. <b>Note:</b> the email backend is not connected yet, so no email was sent. Your signature is saved on this device.', 'ok');
+    say(st, 'Signed. Note: the email backend is not connected yet, so no email was sent. Your signature is saved on this device.', 'ok');
     store.set('stray-w-' + PAGE, rec); setTimeout(() => reveal(rec), 1400); return;
   }
   say(st, 'Sending your waiver and race pack…');
@@ -202,9 +274,9 @@ async function submitWaiver(e) {
     const r = await post(body);
     if (!r || !r.ok) throw new Error(r && r.error || 'Server error');
     store.set('stray-w-' + PAGE, rec);
-    say(st, `Signed. A copy and your race pack are on their way to ${esc(rec.email)} and to the organizer.`, 'ok');
+    say(st, `<span>Signed. A copy and your race pack are on their way to</span> <b>${esc(rec.email)}</b> <span>and to the organizer.</span>`, 'ok');
     setTimeout(() => reveal(rec), 1400);
-  } catch (err) { btn.disabled = false; say(st, 'Could not send. Check your connection and try again. (' + esc(err.message) + ')', 'err'); }
+  } catch (err) { btn.disabled = false; say(st, '<span>Could not send. Check your connection and try again.</span> <small>(' + esc(err.message) + ')</small>', 'err'); }
 }
 
 function reveal(rec) {
@@ -261,7 +333,7 @@ function initRunnerForm() {
     if (!PRIV.endpoint) return say(st, 'The backend is not connected yet, so this form cannot be sent. Nothing was saved. Send these details to the medical lead directly.', 'err');
     say(st, 'Sending…');
     try { const r = await post({ type: 'runnerform', key: PRIV.key, ...data }); if (!r.ok) throw new Error(r.error || 'Server error'); f.reset(); say(st, 'Sent to the medical leads. Thank you.', 'ok'); }
-    catch (err) { say(st, 'Could not send. Try again when you have signal. (' + esc(err.message) + ')', 'err'); }
+    catch (err) { say(st, '<span>Could not send. Try again when you have signal.</span> <small>(' + esc(err.message) + ')</small>', 'err'); }
   });
 }
 
@@ -290,7 +362,7 @@ async function pull() {
     const have = new Set(EVENTS.map(e => e.id)); r.events.forEach(e => { if (!have.has(e.id)) EVENTS.push(e); });
     store.set(EVK, EVENTS); REMOTE = r; renderDash();
     const q = store.get(QK, []).length;
-    const s = $('#dSync'); if (s) s.textContent = `Shared data · last sync ${hm(now())}${q ? ` · ${q} check-ins waiting to send` : ''}.`;
+    const s = $('#dSync'); if (s) s.textContent = q ? `Shared data · last sync ${hm(now())} · ${q} check-ins waiting to send.` : `Shared data · last sync ${hm(now())}.`;
   } catch { const s = $('#dSync'); if (s) s.textContent = `Offline · showing data on this phone · ${store.get(QK, []).length} waiting to send.`; }
 }
 let REMOTE = null;
@@ -351,17 +423,17 @@ function renderCheckin() {
   grid.innerHTML = PRIV.runners.map(r => {
     const inE = EVENTS.filter(e => (e.r === r || e.r === '*') && e.st === sid && e.k === 'in').pop(), outE = EVENTS.filter(e => (e.r === r || e.r === '*') && e.st === sid && e.k === 'out').pop();
     const cond = (EVENTS.filter(e => e.r === r && e.k === 'cond').pop() || {}).v;
-    return `<div class="ci" data-r="${r}"><div class="top"><b>${r}</b><span class="mono">${inE ? 'in ' + hm(inE.t) : '—'} · ${outE ? 'out ' + hm(outE.t) : '—'}</span></div>
+    return `<div class="ci" data-r="${r}"><div class="top"><b>${r}</b><span class="mono"><span>${inE ? 'in ' + hm(inE.t) : '—'}</span> · <span>${outE ? 'out ' + hm(outE.t) : '—'}</span></span></div>
     <div class="btns"><button class="btn ${inE ? 'on' : 'ghost'}" data-k="in">In</button><button class="btn ${outE ? 'on' : 'ghost'}" data-k="out"${sid === 'FIN' ? ' disabled' : ''}>Out</button></div>
     <div class="cond">${['Good', 'Moderate', 'Difficult'].map(c => `<button data-c="${c}" class="${cond === c ? 'on' : ''}">${c}</button>`).join('')}</div></div>`;
   }).join('');
   $$('.ci', grid).forEach(card => {
     const r = card.dataset.r;
-    $$('[data-k]', card).forEach(b => b.addEventListener('click', () => { addEvent({ k: b.dataset.k, st: sid, r, t: evTime(sid) }); renderCheckin(); ciSaid(`${r} ${b.dataset.k} at ${sid} ${hm(evTime(sid))}`); }));
-    $$('[data-c]', card).forEach(b => b.addEventListener('click', () => { addEvent({ k: 'cond', st: sid, r, v: b.dataset.c, t: now() }); renderCheckin(); ciSaid(`${r}: ${b.dataset.c}`); }));
+    $$('[data-k]', card).forEach(b => b.addEventListener('click', () => { addEvent({ k: b.dataset.k, st: sid, r, t: evTime(sid) }); renderCheckin(); ciSaid(`<b>${r}</b> <span>${b.dataset.k === 'in' ? 'In' : 'Out'} · ${sid} · ${hm(evTime(sid))}</span>`); }));
+    $$('[data-c]', card).forEach(b => b.addEventListener('click', () => { addEvent({ k: 'cond', st: sid, r, v: b.dataset.c, t: now() }); renderCheckin(); ciSaid(`<b>${r}</b> <span>${b.dataset.c}</span>`); }));
   });
 }
-const ciSaid = m => say($('#ciStatus'), esc(m) + (PRIV.endpoint ? ' · saved, syncing' : ' · saved on this phone'), 'ok');
+const ciSaid = m => say($('#ciStatus'), m + ' · <span>' + (PRIV.endpoint ? 'saved, syncing' : 'saved on this phone') + '</span>', 'ok');
 
 let wxCache = { t: 0, key: '', txt: '—' };
 async function weather(lat, lon) {
@@ -397,16 +469,16 @@ function renderDash() {
   const A = [];
   if (t >= R.start && t < FIN.arr + 3 * 3600e3) {
     states.forEach(s => {
-      if (s.c === 'r') A.push(['r', `${s.id} will miss or has missed a hard departure (${s.note}). Race director decides: continue with support or withdraw.`]);
-      if (s.late >= 30) A.push(['o', `${s.id} is ${s.late} min behind section pace. Check in: “How are you feeling?”`]);
-      if (s.cond === 'Difficult') A.push(['o', `${s.id} condition Difficult. Medical check at the next station; hydration and calories.`]);
+      if (s.c === 'r') A.push(['r', `<b>${s.id}</b> <span>will miss or has missed a hard departure. Race director decides: continue with support or withdraw.</span>`]);
+      if (s.late >= 30) A.push(['o', `<b>${s.id}</b> <span>is ${s.late} min behind section pace. Check in: “How are you feeling?”</span>`]);
+      if (s.cond === 'Difficult') A.push(['o', `<b>${s.id}</b> <span>condition Difficult. Medical check at the next station; hydration and calories.</span>`]);
     });
     ST.filter(s => s.id !== 'START').forEach(s => {
       const anyIn = EVENTS.some(e => e.st === s.id && e.k === 'in');
-      if (!anyIn && t > s.arr + 20 * MIN && t < (s.dep || s.arr) + 60 * MIN) A.push(['o', `No check-in from ${s.id === 'FIN' ? 'the finish' : s.id} 20 min after expected arrival (${hm(s.arr)}). Call the station lead: ${esc(((PRIV.leads || {})[s.id] || {}).lead || '')}.`]);
+      if (!anyIn && t > s.arr + 20 * MIN && t < (s.dep || s.arr) + 60 * MIN) A.push(['o', `<span>${s.id === 'FIN' ? `No check-in from the finish 20 min after expected arrival (${hm(s.arr)}). Call the station lead:` : `No check-in from ${s.id} 20 min after expected arrival (${hm(s.arr)}). Call the station lead:`}</span> <b>${esc(((PRIV.leads || {})[s.id] || {}).lead || '')}</b>`]);
     });
   }
-  EVENTS.filter(e => e.k === 'incident').slice(-5).reverse().forEach(e => A.push(['r', `Incident ${esc(e.when || hm(e.t))} at ${esc(e.st)}: ${esc(e.v)}`]));
+  EVENTS.filter(e => e.k === 'incident').slice(-5).reverse().forEach(e => A.push(['r', `<span>Incident</span> · ${esc(e.when || hm(e.t))} · ${esc(e.st)} · ${esc(e.v)}`]));
   $('#alerts').innerHTML = A.length ? A.map(([c, m]) => `<li class="${c}">${m}</li>`).join('') : '<li class="note">No alerts.</li>';
   // forms + waivers
   const fs = $('#formsStatus'); if (fs) fs.innerHTML = PRIV.runners.map(r => { const ok = REMOTE && REMOTE.forms && REMOTE.forms.includes(r); return `<span class="${REMOTE ? (ok ? 'yes' : 'no') : ''}" title="${ok ? 'form received' : 'missing'}">${r}${REMOTE ? (ok ? ' ✓' : '') : ''}</span>`; }).join('') + (REMOTE ? '' : '<p class="note">Connect the backend to see which forms arrived.</p>');
@@ -422,9 +494,9 @@ function initCrew() {
   $('#ciStation').addEventListener('change', renderCheckin);
   // default station: the one the pack is heading to
   const p = planAt(now()); const target = p.state === 'stop' ? p.st.id : p.state === 'run' ? p.to.id : 'A1'; if (!store.get('stray-pick-' + PAGE)) $('#ciStation').value = target;
-  $$('[data-status]').forEach(b => b.addEventListener('click', () => { const sid = $('#ciStation').value; addEvent({ k: 'status', st: sid, r: '', v: b.dataset.status, t: now() }); ciSaid(`${sid} ${b.dataset.status}`); }));
-  $('#allIn').addEventListener('click', () => { const sid = $('#ciStation').value, t = evTime(sid); PRIV.runners.forEach(r => { if (!EVENTS.some(e => e.r === r && e.st === sid && e.k === 'in')) addEvent({ k: 'in', st: sid, r, t }); }); renderCheckin(); ciSaid(`All in at ${sid} ${hm(t)}`); });
-  $('#allOut').addEventListener('click', () => { const sid = $('#ciStation').value, t = evTime(sid); if (sid === 'FIN') return; PRIV.runners.forEach(r => { if (!EVENTS.some(e => e.r === r && e.st === sid && e.k === 'out')) addEvent({ k: 'out', st: sid, r, t }); }); renderCheckin(); ciSaid(`All out at ${sid} ${hm(t)}`); });
+  $$('[data-status]').forEach(b => b.addEventListener('click', () => { const sid = $('#ciStation').value; addEvent({ k: 'status', st: sid, r: '', v: b.dataset.status, t: now() }); ciSaid(`<b>${sid}</b> <span>${b.dataset.status}</span>`); }));
+  $('#allIn').addEventListener('click', () => { const sid = $('#ciStation').value, t = evTime(sid); PRIV.runners.forEach(r => { if (!EVENTS.some(e => e.r === r && e.st === sid && e.k === 'in')) addEvent({ k: 'in', st: sid, r, t }); }); renderCheckin(); ciSaid(`<span>All in at ${sid} ${hm(t)}</span>`); });
+  $('#allOut').addEventListener('click', () => { const sid = $('#ciStation').value, t = evTime(sid); if (sid === 'FIN') return; PRIV.runners.forEach(r => { if (!EVENTS.some(e => e.r === r && e.st === sid && e.k === 'out')) addEvent({ k: 'out', st: sid, r, t }); }); renderCheckin(); ciSaid(`<span>All out at ${sid} ${hm(t)}</span>`); });
   $('#csvCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(csv()); say($('#ciStatus'), 'Log copied as CSV.', 'ok'); } catch { say($('#ciStatus'), 'Copy was blocked by the browser.', 'err'); } });
   $('#csvDl').addEventListener('click', e => { const b = new Blob([csv()], { type: 'text/csv' }); e.currentTarget.href = URL.createObjectURL(b); });
   $('#syncNow').addEventListener('click', () => { flush().then(pull); });
