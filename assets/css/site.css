@@ -149,6 +149,8 @@ body.locked .pub{display:none}
 .routemap .stn.big circle{fill:var(--ink)}
 .routemap .stn text{font-family:var(--f-mono);font-size:11px;fill:var(--ink);letter-spacing:.04em}
 .routemap .wp circle{fill:var(--ink-2)}
+.routemap .pin rect{fill:var(--bad);stroke:var(--paper);stroke-width:2}
+.routemap .pin text{font-family:var(--st);font-size:22px;fill:var(--bad)}
 .routemap .wp text{font-family:var(--f-mono);font-size:9px;fill:var(--ink-2)}
 .routemap .pack circle{fill:var(--bad);stroke:var(--paper);stroke-width:2}
 .routemap .pack text,.routemap .rn text{font-family:var(--st);font-size:14px;fill:var(--ink)}

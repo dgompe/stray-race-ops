@@ -145,7 +145,7 @@ const MAP = (() => {
   return { xy, vb: `0 0 ${W + 2 * pd} ${Math.round(H + 2 * pd)}`, cx, cy };
 })();
 const pathD = pts => pts.map((p, i) => (i ? 'L' : 'M') + MAP.xy(p[0], p[1]).map(n => n.toFixed(1)).join(',')).join('');
-function drawMap(svg, { doneKm = null, pack = null, runners = [] } = {}) {
+function drawMap(svg, { doneKm = null, pack = null, runners = [], pins = [] } = {}) {
   if (!svg) return;
   svg.setAttribute('viewBox', MAP.vb);
   let h = `<path class="lake" d="${pathD(R.route)}Z" style="fill:var(--soft);opacity:.35"/>`;
@@ -158,6 +158,7 @@ function drawMap(svg, { doneKm = null, pack = null, runners = [] } = {}) {
     const label = s.id === 'START' ? 'IMD · start/finish' : s.id;
     h += `<g class="stn${s.big ? ' big' : ''}"><circle cx="${x}" cy="${y}" r="${s.big ? 8 : 6}"/><text x="${x + dx * 12}" y="${y + dy * 16 + 4}" text-anchor="${dx < 0 ? 'end' : 'start'}">${label}</text></g>`;
   });
+  pins.forEach(p => { const [x, y] = MAP.xy(p.lat, p.lon); h += `<g class="pin"><rect x="${x - 9}" y="${y - 9}" width="18" height="18" transform="rotate(45 ${x} ${y})"/><text x="${x + 16}" y="${y + 5}">${esc(p.label)}</text></g>`; });
   if (pack) { const [x, y] = MAP.xy(pack[0], pack[1]); h += `<g class="pack"><circle cx="${x}" cy="${y}" r="11"/></g>`; }
   runners.forEach((r, i) => { const [x, y] = MAP.xy(r.p[0], r.p[1]); const a = i / runners.length * Math.PI * 2; const ox = Math.cos(a) * 14, oy = Math.sin(a) * 14; h += `<g class="rn ${r.c}"><circle cx="${x + ox}" cy="${y + oy}" r="9"/><text x="${x + ox + 11}" y="${y + oy + 5}">${esc(r.id)}</text></g>`; });
   svg.innerHTML = h;
@@ -322,6 +323,7 @@ function initPrivate(rec) {
     try { window.print(); } catch { done(); }
     setTimeout(() => { if (document.body.dataset.print) done(); }, 60e3);
   }));
+  const am = $('#airbnbMap'); if (am && PRIV.airbnb) drawMap(am, { pins: [{ lat: PRIV.airbnb.lat, lon: PRIV.airbnb.lon, label: 'Airbnb' }] });
   initRunnerForm(); initIncident(); initCrew();
 }
 
