@@ -181,10 +181,11 @@ drawElev($('#elev'));
 function tickPublic() {
   const t = now(), p = planAt(t), el = $('#packNow');
   let msg;
-  if (p.state === 'pre') msg = `<p class="note">Start Saturday 28.11 at 11:00 at IMD. The map will show where the pack should be.</p>`;
+  if (p.state === 'pre') msg = `<p class="note">Start Saturday 28.11 at 11:00 at IMD.</p>`;
   else if (p.state === 'stop') msg = `<p><b>By schedule the pack is at ${esc(p.st.id)} until ${hm(p.st.dep)} (hard departure).</b></p>`;
   else if (p.state === 'run') msg = `<p><b>By schedule the pack is on ${p.sec}, ${esc(p.from.id === 'START' ? 'IMD' : p.from.id)} → ${esc(p.to.id === 'FIN' ? 'IMD' : p.to.id)}, at about km ${p.km.toFixed(1)}. Next arrival ${hm(p.to.arr)}.</b></p>`;
   else msg = `<p><b>The pack finished at IMD on Sunday at ${hm(FIN.arr)}.</b></p>`;
+  msg += `<p class="golink"><a href="https://dgompe.github.io/stray-race-ops/live/" target="_blank" rel="noopener">Follow the pack live on STRAY Live →</a></p>`;
   if (el) el.innerHTML = msg;
   const bar = $('#packProg'); if (bar) bar.style.width = (p.km / R.routeKm * 100).toFixed(2) + '%';
   drawMap($('#routeMap'), { doneKm: p.state === 'pre' ? null : p.km, pack: p.state === 'pre' ? null : pointAtKm(p.km) });
