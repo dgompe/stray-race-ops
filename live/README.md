@@ -25,18 +25,20 @@ It must sit there because it reads `../assets/js/race.js`, the fonts and the log
 - `places.js`: the emoji stickers people see when they zoom in (Christmas markets, Chillon, IOC, Vidy and so on). One block per place: emoji, name, position, one line for the map, a paragraph, a link. Opening info was checked on 15 Nov 2026. Check it again the week before the race.
 - `CONFIG` at the top of the script in `index.html`: runners, vans, partners, the pledge link behind the QR code.
 
-## Connect the satellite trackers (Poltrax)
+## Connect the GPS trackers (Poltrax)
 
 Until a feed is connected the page shows the planned position and says "By schedule". Vans stay hidden until they send a position.
 
-1. Ask Poltrax for Partner API access for the event (positions endpoint + key).
+1. Poltrax gives one URL with a private key in it. It goes in `POLTRAX_URL` in the script, never in the page.
 2. Follow the five steps at the top of `backend/Tracker.gs`.
 3. Paste the web-app URL into `CONFIG.feedUrl` in `index.html`.
 4. In `CONFIG.runners` and `CONFIG.vehicles`, set each `tracker` to the id or bib Poltrax uses. If Poltrax has the full names (and the vans are called Sprinter, Van A, Van B), you can leave it empty: the page matches by name.
 
 The page asks the feed every 20 s. If the feed fails, or a tracker is silent for 12 minutes, it falls back to the schedule or shows "Last seen".
 
-If Poltrax only gives an embed link: put it in `"poltrax"` in `race.js`. A "Satellite map" button appears and opens their map inside the panel.
+The trackers send over the mobile network (LTE-M). Where there is no signal they keep logging and upload once back in range. On the page that shows as "Last seen" on a runner, or "Last signal hh:mm" in the top bar when every tracker is out of range.
+
+Backup: Poltrax also runs the event on their own live map. If the feed has a bad moment, put that link in `"poltrax"` in `race.js`. A "Poltrax map" button appears and opens their map inside the panel.
 
 ## Test before race day
 

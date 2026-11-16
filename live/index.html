@@ -693,7 +693,7 @@ function readFeed(j) { // accepts the Tracker.gs shape, plain arrays, common wra
     const p = o.position || o.lastPosition || o.last || o.location || o.gps || o;
     return { id: String(o.id ?? o.tracker ?? o.bib ?? o.number ?? o.device ?? o.deviceId ?? o.imei ?? ''), name: String(o.name ?? o.fullName ?? o.participant ?? o.label ?? [o.firstName, o.lastName].filter(Boolean).join(' ')),
       lat: num(p.lat ?? p.latitude ?? p.y), lon: num(p.lon ?? p.lng ?? p.long ?? p.longitude ?? p.x),
-      ts: time(p.ts ?? p.time ?? p.timestamp ?? p.updated ?? p.updatedAt ?? p.date ?? o.ts ?? o.time ?? o.timestamp), speed: num(p.speed ?? o.speed), battery: num(p.battery ?? o.battery) };
+      ts: time(p.ts ?? p.time ?? p.timestamp ?? p.updated ?? p.updatedAt ?? p.date ?? o.ts ?? o.time ?? o.timestamp), speed: num(p.speed ?? o.speed), battery: num(p.battery ?? o.battery), km: num(o.km ?? o.routeKm ?? o.route_km ?? p.km) };
   }).filter(r => isFinite(r.lat) && isFinite(r.lon) && Math.abs(r.lat) <= 90);
 }
 function demoFeed(t) { // simulated trackers: a pack a few minutes behind plan, vans leap-frogging the stations
@@ -730,7 +730,7 @@ function update() {
   let live = 0;
   RUN.forEach(r => {
     const row = fresh ? matchRow(r, FEED.rows) : null;
-    if (row) { const k = kmOf(row.lat, row.lon, r.src === 'live' ? r.km : plan.km); r.km = k.km; r.ll = [row.lat, row.lon]; r.ts = row.ts; r.speed = row.speed; r.src = 'live'; r.stale = row.ts ? t - row.ts > CONFIG.staleMin * MIN : false; if (!r.stale) live++; }
+    if (row) { const hint = r.src === 'live' ? r.km : plan.km, k = kmOf(row.lat, row.lon, hint); r.km = isFinite(row.km) && row.km >= 0 && row.km <= R.routeKm + .5 ? Math.min(row.km, R.routeKm) : k.km; r.ll = [row.lat, row.lon]; r.ts = row.ts; r.speed = row.speed; r.src = 'live'; r.stale = row.ts ? t - row.ts > CONFIG.staleMin * MIN : false; if (!r.stale) live++; }
     else { r.km = plan.km; r.ll = planLL; r.src = 'plan'; r.ts = 0; r.stale = false; }
   });
   VAN.forEach(v => { const row = fresh ? matchRow(v, FEED.rows, true) : null; if (row) { v.ll = [row.lat, row.lon]; v.ts = row.ts; v.stale = row.ts ? t - row.ts > CONFIG.staleMin * MIN : false; } else if (!fresh) v.ll = null; });
@@ -741,8 +741,9 @@ function update() {
   DELTA = LIVE && newest && PACKKM > .3 && PACKKM < R.routeKm - .1 && !ST.some(s => Math.abs(s.km - PACKKM) < .25) ? Math.round((newest - timeAtKm(PACKKM)) / MIN) : null;
 
   const chip = $('#chip'); chip.className = 'chip mono' + (LIVE ? ' live' : '') + (DEMO ? ' demo' : '');
-  $('#chipT').textContent = (DEMO ? 'Demo · ' : '') + (LIVE ? 'Live · satellite' : 'By schedule');
-  chip.title = LIVE ? 'Positions from the satellite trackers.' : 'Positions calculated from the race schedule. The pack can run a few minutes early or late.';
+  const gap = !LIVE && newest > 0 && plan.state !== 'pre';
+  $('#chipT').textContent = (DEMO ? 'Demo · ' : '') + (LIVE ? 'Live · GPS' : gap ? 'Last signal ' + hm(newest) : 'By schedule');
+  chip.title = LIVE || gap ? 'Positions from the GPS trackers. They send over the mobile network: where there is no signal, a dot waits until the tracker is back in range, then the track fills in.' : 'Positions calculated from the race schedule. The pack can run a few minutes early or late.';
 
   const k = plan.state === 'pre' ? 0 : PACKKM;
   if (READY) map.getSource('done').setData(gj('LineString', k > 0 ? P.filter(p => p[3] <= k).map(p => [p[1], p[0]]).concat([G(pointAtKm(k))]) : []));
@@ -975,8 +976,8 @@ $('#allRunners').onclick = () => openList(RUN, 'Runners');
 
 // Poltrax iframe, if that is all the provider gives: set "poltrax" in race.js
 if (R.poltrax && /^https:\/\//.test(R.poltrax)) {
-  const b = document.createElement('button'); b.className = 'btn ghost'; b.type = 'button'; b.textContent = 'Satellite map';
-  b.onclick = () => { show('Poltrax · satellite trackers', '', 'SAT', null); const pb = $('#pB'); pb.className = 'pb frame'; pb.innerHTML = `<iframe src="${esc(R.poltrax)}" title="Live tracking" loading="lazy"></iframe>`; };
+  const b = document.createElement('button'); b.className = 'btn ghost'; b.type = 'button'; b.textContent = 'Poltrax map';
+  b.onclick = () => { show('Poltrax · live map', '', 'SAT', null); const pb = $('#pB'); pb.className = 'pb frame'; pb.innerHTML = `<iframe src="${esc(R.poltrax)}" title="Live tracking" loading="lazy"></iframe>`; };
   $('#allRunners').before(b);
 }
 

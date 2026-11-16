@@ -13,6 +13,9 @@
  * a tracker named "Sprinter", "Van A" or "Van B" (or with the id set in CONFIG.vehicles) is drawn as a van.
  *
  * Set-up (5 minutes, once you have API access from Poltrax):
+ * Poltrax gives one URL with a private key in it. Put that URL in POLTRAX_URL and leave
+ * POLTRAX_KEY empty. Never paste the Poltrax URL into the page itself: the page is public.
+ *
  *   1. script.google.com → New project → paste this file. Do NOT paste it into the pledge
  *      Sheet's script: that one already has its own doGet.
  *   2. Project Settings → Script properties:
@@ -81,6 +84,7 @@ function mapRow(o) {
     ts: ts,
     speed: Number(pick(g.speed, o.speed, NaN)),
     battery: Number(pick(g.battery, o.battery, NaN)),
+    km: Number(pick(o.km, o.routeKm, o.route_km, g.km, NaN)),   // Poltrax's km on the route, from our GPX
   };
 }
 
