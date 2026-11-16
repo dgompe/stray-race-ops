@@ -288,3 +288,6 @@ html.night .logos img{opacity:.9}
   a{text-decoration:none}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.prog i{transition:none}}
+
+.golive{margin-top:28px;padding-top:20px;border-top:1px solid currentColor;display:grid;gap:10px}
+.golive p{margin:0}
