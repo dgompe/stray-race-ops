@@ -532,7 +532,7 @@ function camFor() { // the camera that puts the whole loop inside the free part 
 function fitAll(ms = 1400) { wrap.classList.toggle('flat', MODE === 'flat'); map.resize(); const c = camFor(); if (ms && !CALM) map.flyTo({ ...c, duration: ms, essential: true }); else { map.jumpTo(c); } }
 const offs = () => { const pn = $('#panel'); return PHONE() ? [0, -pn.offsetHeight / 2 + 40] : [-pn.offsetWidth / 2 + (innerWidth > 1100 ? 120 : 0), 40]; };
 const reveal = ll => map.easeTo({ center: G(ll), offset: offs(), duration: 600, essential: true });
-const focus = (ll, z) => map.flyTo({ center: G(ll), zoom: Math.max(map.getZoom(), z - 1), offset: offs(), duration: CALM ? 0 : 1100, essential: true });
+const focus = (ll, z) => map.flyTo({ center: G(ll), zoom: Math.max(map.getZoom(), z - 1), bearing: TOUCHED ? map.getBearing() : VIEWS[MODE].bearing, pitch: VIEWS[MODE].pitch, offset: offs(), duration: CALM ? 0 : 1100, essential: true });
 
 /* layers */
 const gj = (type, coordinates) => ({ type: 'Feature', properties: {}, geometry: { type, coordinates } });
@@ -668,8 +668,8 @@ function horizon() {
 map.on('rotate', horizon); map.on('load', horizon);
 
 /* a slow sway while nobody touches the map, so the range drifts behind the lake */
-let lastInput = Date.now(), swayDir = 1, swaying = false, swayBase = 0;
-['mousedown', 'touchstart', 'wheel', 'keydown'].forEach(ev => addEventListener(ev, () => { lastInput = Date.now(); swaying = false; }, { passive: true }));
+let TOUCHED = false, lastInput = Date.now(), swayDir = 1, swaying = false, swayBase = 0;
+['mousedown', 'touchstart', 'wheel', 'keydown'].forEach(ev => addEventListener(ev, () => { TOUCHED = true; lastInput = Date.now(); swaying = false; }, { passive: true }));
 if (!CALM) setInterval(() => {
   if (!READY || MODE !== 'pano' || SEL || document.hidden || Date.now() - lastInput < 25000 || Z() > 11.6) { swaying = false; return; }
   if (!swaying) swayBase = map.getBearing();
@@ -994,7 +994,7 @@ board(); setInterval(board, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { poll(); board(); } });
 // shared link to one point: …/live/#A4
 { const id = location.hash.slice(1), p = id && [...POINTS, ...PLACES].find(x => x.id === id);
-  if (p) map.once('load', () => setTimeout(() => p.kind === 'poi' ? openPlace(p) : openPoint(p), 400)); }
+  if (p) map.once('load', () => setTimeout(() => p.kind === 'poi' ? openPlace(p) : openPoint(p), CALM || Q.has('t') || DEMO ? 400 : 2600)); }
 })();
 </script>
 </body>
