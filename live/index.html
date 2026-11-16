@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>STRAY Live · Lake Tour Edition</title>
+<meta name="description" content="Follow the STRAY Lake Tour Edition live: where the runners are, when they reach each aid station, where you can join, and what is pledged so far.">
+<meta name="theme-color" content="#2e2452">
+<meta property="og:title" content="STRAY Live · Lake Tour Edition">
+<meta property="og:description" content="Follow the runners around Lac Léman. 28–29 November 2026.">
+<link rel="icon" href="../assets/stray-ink.png">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<style>
+/* STRAY Live. Same tokens, fonts and ruled look as the STRAY sites. Spacing steps: 4 · 8 · 12 · 16 · 24. */
+@font-face{font-family:"Stencil";src:url(../assets/fonts/stick-no-bills-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Stencil";src:url(../assets/fonts/stick-no-bills-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Archivo V";src:url(../assets/fonts/archivo-latin-standard-normal.woff2) format("woff2");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
+@font-face{font-family:"Plex Mono";src:url(../assets/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Plex Mono";src:url(../assets/fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2");font-weight:500;font-display:swap}
+:root{
+  --ink:#2e2452;--ink-2:#5b4f86;--line:#2e2452;--soft:#2e245226;--paper:#f6efe9;--paper-2:#ece3db;
+  --ok:#2f7a4f;--warn:#b86a12;--bad:#a3243b;
+  --land:#f6efe9;--lake:#d9d0e8;--decor:#2e245266;--sky:#f6efe9;--mtn:#d9d0e8;--mtn2:#ece3db;
+  --emoji:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  --st:"Stencil","Arial Narrow",Impact,sans-serif;--f-body:"Archivo V",Helvetica,Arial,sans-serif;--f-mono:"Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+html.night{--ink:#f6efe9;--ink-2:#cfc4e2;--line:#f6efe9;--soft:#f6efe92e;--paper:#1b1534;--paper-2:#2a2150;--ok:#6fd39a;--warn:#ffb65c;--bad:#ff7a90;
+  --land:#1b1534;--lake:#2c2260;--decor:#f6efe959;--sky:#120d26;--mtn:#2c2260;--mtn2:#221a47;color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;height:100dvh;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+a{color:inherit;text-underline-offset:3px}
+:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;line-height:1.4}
+svg.i{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;gap:16px;padding:0 16px;padding-top:env(safe-area-inset-top);border-bottom:1px solid var(--line);height:calc(60px + env(safe-area-inset-top))}
+.brand{display:flex;align-items:center;gap:16px;text-decoration:none;min-width:0}
+.brand img{display:block;height:32px;width:auto}
+.brand .lg-night,html.night .brand .lg-day{display:none}
+html.night .brand .lg-night{display:block}
+.brand .ttl{display:flex;flex-direction:column;gap:2px;padding-left:16px;border-left:1px solid var(--soft)}
+.brand .ttl b{font-family:var(--st);font-weight:400;font-size:22px;line-height:1;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+.top .sp{flex:1}
+.clock{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:118px}
+.clock b{font-family:var(--st);font-weight:400;font-size:28px;line-height:.92;letter-spacing:.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:0 12px;height:32px;white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--ink-2)}
+.chip.live i{background:var(--bad);animation:blink 1.6s infinite}
+.chip.demo{border-style:dashed}
+@keyframes blink{50%{opacity:.25}}
+.tbtn{border:1px solid var(--line);padding:0 12px;height:32px}
+.tbtn:hover{background:var(--paper-2)}
+.prog{position:absolute;left:0;top:0;height:3px;background:var(--ok);z-index:900;width:0;transition:width 1s linear}
+
+/* ---------- map ---------- */
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:var(--land)}
+.mapwrap:not(.flat) #map{top:128px}
+.maplibregl-canvas{outline:none}
+.maplibregl-map{font:inherit}
+/* horizon */
+.pano{position:absolute;z-index:500;left:0;right:0;top:0;height:128px;background:var(--sky);border-bottom:1.5px solid var(--line);overflow:hidden;pointer-events:none}
+.flat .pano{display:none}
+.pano svg{position:absolute;inset:0;width:100%;height:100%}
+.pano .far{fill:var(--mtn);stroke:var(--ink);stroke-width:1.3;stroke-linejoin:round}
+.pano .snow{fill:var(--paper);stroke:var(--ink);stroke-width:.7;stroke-linejoin:round}
+.pano .near{fill:var(--mtn2);stroke:var(--ink);stroke-width:1;stroke-opacity:.5;stroke-linejoin:round}
+.pano .lbls span{position:absolute;transform:translateX(-50%);font-family:var(--f-mono);font-size:9px;letter-spacing:.08em;color:var(--ink-2);white-space:nowrap;text-transform:uppercase}
+.pano .lbls b{font-weight:500;color:var(--ink)}
+.pano .sky i{position:absolute;font-style:normal;font-family:var(--emoji);line-height:1}
+.pano .sun{left:4%;top:8px;font-size:22px}
+.pano .cl{font-size:22px;opacity:.85;left:100%;animation:drift 120s linear infinite}
+.pano .cl.b{top:30px;font-size:16px;animation-duration:170s;animation-delay:-60s}
+.pano .cl.c{top:6px;font-size:18px;animation-duration:210s;animation-delay:-140s}
+.pano .cl.a{top:14px;animation-delay:-20s}
+@keyframes drift{to{transform:translateX(calc(-100vw - 60px))}}
+/* controls */
+.ctl{position:absolute;z-index:800;right:16px;top:16px;display:flex;flex-direction:column;gap:8px}
+.mapwrap:not(.flat) .ctl,.mapwrap:not(.flat) .now{top:144px}
+.ctl div{display:flex;flex-direction:column;border:1px solid var(--line);background:var(--paper)}
+.ctl button{width:36px;height:36px;display:grid;place-items:center;border-top:1px solid var(--line);font-family:var(--f-mono);font-size:17px;line-height:1}
+.ctl button:first-child{border-top:0}
+.ctl button:hover{background:var(--paper-2)}
+.ctl svg{width:16px;height:16px}
+.ctl #cView{font-size:11px;letter-spacing:.06em;font-weight:500}
+
+/* decoration */
+.dc{width:0;height:0;overflow:visible;pointer-events:none!important;color:var(--decor)}
+.dc.em i{position:absolute;left:0;top:0;transform:translate(-50%,-50%);font-style:normal;font-family:var(--emoji);font-size:19px;line-height:1;animation:bob 3.4s ease-in-out infinite}
+.dc.ferry i{font-size:26px;animation-duration:2.6s}
+@keyframes bob{50%{margin-top:-4px;rotate:5deg}}
+.z-info .dc.em:not(.ferry){display:none}
+.dc span{position:absolute;transform:translate(-50%,-50%);font-family:var(--st);text-transform:uppercase;white-space:nowrap;letter-spacing:.5em;font-size:15px}
+.dc.big span{font-size:26px;letter-spacing:.42em}
+.z-street .dc,.z-far .dc:not(.big):not(.ferry){display:none}
+.kmk{width:0;height:0;overflow:visible;pointer-events:none!important}
+.kmk span{position:absolute;transform:translate(-50%,-50%);font-family:var(--f-mono);font-size:9px;letter-spacing:.04em;background:var(--land);color:var(--ink-2);padding:1px 4px;border:1px solid var(--soft);white-space:nowrap}
+#map:not(.z-lbl) .kmk{display:none}
+
+/* markers: zero-size anchor, children centred on it */
+.mk,.poi,.van,.pk{width:0;height:0;overflow:visible;cursor:pointer}
+.mk .dot{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;background:var(--paper);border:2px solid var(--ink)}
+.mk.big .dot{background:var(--ink)}
+.mk.se .dot{left:-9px;top:-9px;width:18px;height:18px;background:var(--ink);box-shadow:0 0 0 3px var(--paper),0 0 0 4px var(--ink)}
+.mk.join .dot{border-radius:0;transform:rotate(45deg);left:-6px;top:-6px;width:12px;height:12px;background:var(--bad);border-color:var(--paper)}
+.hit{position:absolute;left:-18px;top:-18px;width:36px;height:36px;border-radius:50%}
+.mk .tag{position:absolute;top:-12px;left:14px;display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;background:var(--paper);border:1px solid var(--line);font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;white-space:nowrap;cursor:pointer}
+.mk.l .tag{left:auto;right:14px}
+.mk .tag b{font-family:var(--st);font-weight:400;font-size:15px;letter-spacing:.03em}
+.mk .tag .xt{display:none;color:var(--ink-2);padding-left:6px;border-left:1px solid var(--soft)}
+.z-info .mk .tag .xt{display:inline}
+.mk.next .tag .xt{color:inherit;border-color:currentColor}
+.mk.join .tag{border-color:var(--bad);color:var(--bad)}
+.mk.past .dot{opacity:.45}.mk.past .tag{opacity:.5}
+.mk.next .tag{background:var(--ink);color:var(--paper)}
+.sel .tag,.sel .lbl{outline:2px solid var(--ink);outline-offset:1px}
+.hide{display:none!important}
+
+.poi .ic{position:absolute;left:-16px;top:-16px;width:32px;height:32px;display:grid;place-items:center;font-style:normal;font-family:var(--emoji);font-size:18px;line-height:1;background:var(--paper);border:1px solid var(--line);transition:transform .18s cubic-bezier(.3,1.6,.5,1)}
+.poi:hover .ic,.poi.sel .ic{transform:scale(1.22) rotate(-5deg)}
+.poi.yes .ic{background:var(--ink);color:var(--paper)}
+.poi .lbl{position:absolute;top:-16px;left:20px;display:none;flex-direction:column;justify-content:center;min-height:32px;padding:3px 8px;background:var(--paper);border:1px solid var(--soft);white-space:nowrap;cursor:pointer}
+.poi.l .lbl{left:auto;right:20px;text-align:right}
+.poi .lbl b{font-size:12px;font-weight:600;line-height:1.25}
+.poi .lbl em{display:none;font-style:normal;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.04em;color:var(--ink-2);line-height:1.35}
+.poi.yes .lbl em{color:var(--ok)}
+.z-lbl .poi .lbl{display:flex}
+.z-info .poi .lbl em{display:block}
+
+.van .box{position:absolute;left:-19px;top:-16px;width:38px;height:32px;display:grid;place-items:center;font-style:normal;font-family:var(--emoji);font-size:21px;line-height:1;background:var(--paper);border:2px solid var(--ink);transition:transform .18s cubic-bezier(.3,1.6,.5,1)}
+.van:hover .box{transform:scale(1.15) rotate(-4deg)}
+.van .nm{position:absolute;top:20px;left:0;transform:translateX(-50%);font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:1px 5px;white-space:nowrap}
+.van.stale .box{opacity:.55}
+
+
+.pk .stack{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;cursor:pointer}
+.pk .av{width:44px;height:44px;border-radius:50%;background:var(--paper-2) center/cover;border:2px solid var(--paper);box-shadow:0 0 0 2px var(--bad);margin-left:-14px;flex:none}
+.pk .av:first-child{margin-left:0}
+.pk .more{margin-left:-10px;min-width:30px;height:30px;padding:0 6px;border-radius:15px;background:var(--bad);color:#fff;font-family:var(--st);font-size:16px;display:grid;place-items:center;border:2px solid var(--paper);flex:none}
+html.night .pk .more,html.night .pk .cap{color:#1b1534}
+.pk.plan .av{box-shadow:0 0 0 2px var(--ink-2)}
+.pk.plan .more,.pk.plan .cap{background:var(--ink-2)}
+.pk .ring{position:absolute;left:-30px;top:-30px;width:60px;height:60px;border-radius:50%;border:2px solid var(--bad);animation:ring 2.2s ease-out infinite;pointer-events:none}
+.pk.plan .ring{display:none}
+@keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+.pk .cap{position:absolute;top:30px;left:0;transform:translateX(-50%);background:var(--bad);color:#fff;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.pk .ring,.chip.live i{animation:none}}
+
+/* layer switches */
+.no-st .mk.st,.no-join .mk.join,.no-poi .poi,.no-van .van{display:none}
+
+/* ---------- overlays on the map ---------- */
+.now{position:absolute;z-index:800;left:16px;top:16px;width:336px;background:var(--paper);border:1px solid var(--line);padding:16px}
+.now .h{font-family:var(--st);font-size:30px;line-height:1;text-transform:uppercase;letter-spacing:.02em;margin:8px 0}
+.now p{margin:0;font-size:14px;line-height:1.4}
+.now .delta{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-top:8px}
+.now .delta.late{color:var(--warn)}.now .delta.early{color:var(--ok)}
+.now .joinnext{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;margin-top:12px;padding-top:12px;border-top:1px solid var(--soft)}
+.now .joinnext b{font-weight:600;display:block;margin-top:2px}
+.now .joinnext:hover b{text-decoration:underline}
+.now .joinnext>span:last-child{font-family:var(--st);font-size:20px;white-space:nowrap}
+
+.legend{position:absolute;z-index:800;left:16px;bottom:16px;display:flex;align-items:center;gap:8px;max-width:calc(100% - 32px)}
+.legend .sw{display:flex;border:1px solid var(--line);background:var(--paper)}
+.legend button{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-left:1px solid var(--line);white-space:nowrap}
+.legend button:first-child{border-left:0}
+.legend button[aria-pressed="false"]{color:var(--ink-2);text-decoration:line-through;background:var(--paper-2)}
+.legend button i{width:10px;height:10px;border:2px solid currentColor;border-radius:50%;flex:none}
+.legend button i.j{border-radius:0;transform:rotate(45deg) scale(.8);background:var(--bad);border-color:var(--bad)}
+.legend button i.p{border-radius:0;border-width:1px}
+.legend button i.v{border-radius:0;background:currentColor;width:13px;height:9px}
+.legend .hint{background:var(--paper);border:1px solid var(--soft);height:32px;display:flex;align-items:center;padding:0 10px;color:var(--ink-2);white-space:nowrap}
+
+.raise{position:absolute;z-index:800;right:16px;bottom:16px;display:flex;align-items:stretch;background:var(--paper);border:1px solid var(--line);text-align:left}
+.raise:hover{background:var(--paper-2)}
+.raise .t{display:flex;flex-direction:column;justify-content:space-between;gap:8px;padding:12px 16px 12px 12px}
+.raise .t b{font-family:var(--st);font-weight:400;font-size:34px;line-height:.9;letter-spacing:.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.raise .t u{text-decoration:none;font-size:13px;font-weight:500;border-bottom:1px solid currentColor;align-self:flex-start}
+.qr{background:#f6efe9;color:#2e2452;padding:8px;display:block;line-height:0}
+.raise .qr{width:96px;height:96px;border-left:1px solid var(--line)}
+.qr svg{width:100%;height:100%;display:block}
+
+/* ---------- runners dock ---------- */
+.dock{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding:8px 16px;height:64px}
+.strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;-webkit-mask:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask:linear-gradient(90deg,#000 calc(100% - 28px),transparent);padding-right:20px}
+.strip::-webkit-scrollbar{display:none}
+.strip button{flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 0;border:1px solid var(--soft);height:48px;text-align:left}
+.strip button:hover{border-color:var(--line)}
+.strip img{width:46px;height:46px;object-fit:cover;display:block}
+.strip span{font-size:13px;font-weight:500;white-space:nowrap;line-height:1.25}
+.strip small{display:block;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:400}
+.strip .vn{padding:0 12px}
+.strip .vn .vi{font-style:normal;font-family:var(--emoji);font-size:22px;line-height:1;flex:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;background:var(--ink);color:var(--paper);text-decoration:none;font-size:14px;font-weight:500;border:1px solid var(--ink);white-space:nowrap;flex:none}
+.btn:hover{opacity:.9}
+.btn.ghost{background:none;color:var(--ink)}
+.btn.ghost:hover{background:var(--paper-2);opacity:1}
+.btn.two{flex-direction:column;gap:0;align-items:flex-start;line-height:1.2}
+.btn.two small{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:400;opacity:.85}
+
+/* ---------- partners band: one moving line, main partners larger ---------- */
+.partners{border-top:1px solid var(--line);height:calc(56px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);overflow:hidden}
+.marq{height:100%;overflow:hidden}
+.track{display:flex;align-items:center;gap:44px;height:100%;width:max-content;animation:marq 80s linear infinite}
+@keyframes marq{to{transform:translateX(-50%)}}
+.lg{display:block;flex:none;background:currentColor;-webkit-mask:var(--u) center/contain no-repeat;mask:var(--u) center/contain no-repeat;height:22px;opacity:.9}
+.lg img{display:block;height:100%;width:auto;opacity:0}
+.partners a{display:block;flex:none}
+.partners a:hover .lg{opacity:.6}
+.partners .pm{display:flex;align-items:center;gap:16px;height:100%;padding:0 24px;background:var(--ink);color:var(--paper)}
+.partners .pm .mono{white-space:nowrap;opacity:.8}
+.partners .pm .lg{height:32px;opacity:1}
+@media (prefers-reduced-motion:reduce){.track{animation-duration:240s}}
+
+/* ---------- panel ---------- */
+.panel{position:absolute;z-index:1100;top:0;right:0;bottom:0;width:400px;max-width:100%;background:var(--paper);border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(102%);transition:transform .28s cubic-bezier(.7,0,.15,1);visibility:hidden}
+.panel.open{transform:none;visibility:visible}
+.panel .ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel .x{width:36px;height:36px;border:1px solid var(--line);font-family:var(--f-mono);font-size:15px}
+.panel .x:hover{background:var(--paper-2)}
+.panel .pb{overflow-y:auto;padding:16px 16px 24px;flex:1;-webkit-overflow-scrolling:touch}
+.panel h2{font-family:var(--st);font-weight:400;font-size:40px;line-height:.92;text-transform:uppercase;letter-spacing:.01em;margin:0 0 8px}
+.panel h3{font-family:var(--f-mono);font-weight:400;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:24px 0 8px}
+.panel p{margin:0 0 12px}
+.panel .sub{font-size:16px;margin:0 0 16px}
+.figs{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);margin:16px 0}
+.figs.two{grid-template-columns:repeat(2,1fr)}.figs.one{grid-template-columns:1fr}
+.figs div{padding:12px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-width:0}
+.figs div:first-child{border-left:0}
+.figs b{font-family:var(--st);font-weight:400;font-size:28px;line-height:.9;letter-spacing:.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.figs small{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.06em;color:var(--ink-2)}
+.rows{margin:0;padding:0;list-style:none;border-top:1px solid var(--soft)}
+.rows li{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--soft);font-size:14px}
+.rows li span:first-child{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);padding-top:2px;flex:none}
+.rows li span:last-child{text-align:right}
+.state{display:inline-block;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);padding:4px 8px;margin-bottom:12px}
+.state.on{background:var(--ink);color:var(--paper)}
+.state.ok{border-color:var(--ok);color:var(--ok)}
+.callout{border:1px solid var(--bad);padding:12px;margin:16px 0}
+.callout b{display:block;font-family:var(--st);font-weight:400;font-size:22px;line-height:1;text-transform:uppercase;color:var(--bad);margin-bottom:8px}
+.callout p{margin:0 0 4px}.callout p:last-child{margin:0}
+.note{font-size:13px;color:var(--ink-2);margin:12px 0}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.photo{width:100%;aspect-ratio:4/3;object-fit:cover;object-position:50% 25%;display:block;border:1px solid var(--line);margin-bottom:16px;background:var(--paper-2)}
+.plist{margin:0;padding:0;list-style:none}
+.plist button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:8px 0;border-bottom:1px solid var(--soft)}
+.plist button:hover b{text-decoration:underline}
+.plist img,.plist .vi{width:52px;height:52px;object-fit:cover;flex:none}
+.plist .vi{display:grid;place-items:center;font-style:normal;font-family:var(--emoji);font-size:26px;line-height:1;border:1px solid var(--soft)}
+.plist b{display:block;font-weight:600}
+.plist small{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.board{margin:0;padding:0;list-style:none;border-top:1px solid var(--soft);counter-reset:n}
+.board li{display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--soft);font-size:14px;counter-increment:n}
+.board li::before{content:counter(n,decimal-leading-zero);font-family:var(--f-mono);font-size:10.5px;color:var(--ink-2)}
+.board li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board li b{font-family:var(--st);font-weight:400;font-size:18px;letter-spacing:.02em;white-space:nowrap}
+.pledgeqr{display:flex;gap:16px;align-items:center;border:1px solid var(--line);margin:16px 0}
+.pledgeqr .qr{width:132px;height:132px;flex:none;border-right:1px solid var(--line)}
+.pledgeqr div{padding:12px 12px 12px 0}
+.pledgeqr b{display:block;font-family:var(--st);font-weight:400;font-size:24px;line-height:1;text-transform:uppercase;margin-bottom:8px}
+.pledgeqr p{margin:0;font-size:13px}
+.panel iframe{width:100%;height:100%;border:0;display:block}
+.panel .pb.frame{padding:0}
+
+/* ---------- phone ---------- */
+@media (max-width:1000px){.raise{display:none}}
+@media (max-width:720px){
+  .top{gap:8px;padding-left:12px;padding-right:12px;height:calc(52px + env(safe-area-inset-top))}
+  .brand .ttl{display:none}.brand img{height:26px}
+  .clock{min-width:0}.clock b{font-size:22px}
+  .chip,.tbtn{height:28px;padding:0 8px}
+  #night{display:none}
+  .now{left:12px;top:12px;width:calc(100% - 72px);max-width:336px;padding:12px}
+  .now .h{font-size:24px;margin:4px 0 8px}
+  .now .joinnext{margin-top:8px;padding-top:8px}
+  .legend{left:12px;bottom:12px;max-width:calc(100% - 24px);overflow-x:auto;scrollbar-width:none}
+  .legend .hint{display:none}
+  .dock{gap:8px;padding:8px 12px;height:60px}
+  .strip span{display:none}.strip button{padding:0;border-color:transparent;height:44px}
+  .strip img{width:44px;height:44px;border-radius:50%}
+  .strip .vn{display:none}
+  .btn{padding:0 12px;font-size:13.5px;min-height:44px}
+  .partners{height:calc(44px + env(safe-area-inset-bottom))}
+  .partners .pm{gap:10px;padding:0 16px}.partners .pm .lg{height:24px}.lg{height:18px}.track{gap:30px;animation-duration:60s}
+  .pano{height:84px}.ctl{right:12px}.mapwrap:not(.flat) #map{top:84px}
+  .mapwrap:not(.flat) .ctl,.mapwrap:not(.flat) .now{top:96px}
+  .mapwrap.flat .ctl{top:12px}
+  .panel{top:auto;left:0;right:0;width:100%;height:min(60%,520px);border-left:0;border-top:1px solid var(--line);transform:translateY(102%)}
+  .panel h2{font-size:34px}
+  .photo{aspect-ratio:16/9}
+  .mapwrap:has(.panel.open) .now,.mapwrap:has(.panel.open) .legend{display:none}
+}
+@media (max-width:480px){#allRunners{display:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="../index.html" aria-label="STRAY race info">
+    <img class="lg-day" src="../assets/stray-ink.png" alt="STRAY"><img class="lg-night" src="../assets/stray.png" alt="STRAY">
+    <span class="ttl"><b>Lake Tour Edition</b><span class="mono">Live · 28–29 Nov 2026</span></span>
+  </a>
+  <span class="sp"></span>
+  <span class="chip mono" id="chip"><i></i><span id="chipT">By schedule</span></span>
+  <div class="clock" aria-live="off"><span class="mono" id="ckL">Start in</span><b id="ck">--:--:--</b></div>
+  <button class="tbtn mono" id="night" type="button" aria-pressed="false">Night</button>
+</header>
+
+<main class="mapwrap">
+  <div class="prog" id="prog"></div>
+  <div class="pano" id="pano" aria-hidden="true"><div class="sky"><i class="sun" id="sun">☀️</i><i class="cl a">☁️</i><i class="cl b">☁️</i><i class="cl c">☁️</i></div><svg id="panoSvg" preserveAspectRatio="none"></svg><div class="lbls" id="panoLbl"></div></div>
+  <div class="ctl" id="ctl">
+    <div><button type="button" id="cIn" aria-label="Zoom in">+</button><button type="button" id="cOut" aria-label="Zoom out">−</button></div>
+    <div><button type="button" id="cFit" title="Whole lake" aria-label="Show the whole lake"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 6V1h5M10 1h5v5M15 10v5h-5M6 15H1v-5"/></svg></button><button type="button" id="cFind" title="Find the runners" aria-label="Go to the runners"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="3"/><path d="M8 0v3M8 13v3M0 8h3M13 8h3"/></svg></button></div>
+    <div><button type="button" id="cView" title="Flat map, north up">2D</button></div>
+  </div>
+  <div id="map" aria-label="Map of the route around Lac Léman with aid stations, join points, places, support vans and runners"></div>
+
+  <section class="now" id="now" aria-live="polite">
+    <span class="mono" id="nowE">Now</span>
+    <div class="h" id="nowH">Lake Tour Edition</div>
+    <p id="nowP"></p>
+    <div class="delta" id="nowD" hidden></div>
+    <button class="joinnext" id="joinNext" type="button" hidden><span><span class="mono">Join next</span><b id="jnT"></b></span><span id="jnW"></span></button>
+  </section>
+
+  <div class="legend" id="legend">
+    <div class="sw mono" role="group" aria-label="Show on the map">
+      <button type="button" data-k="st" aria-pressed="true"><i></i>Aid stations</button>
+      <button type="button" data-k="join" aria-pressed="true"><i class="j"></i>Join points</button>
+      <button type="button" data-k="poi" aria-pressed="true"><i class="p"></i>Places</button>
+      <button type="button" data-k="van" aria-pressed="true"><i class="v"></i>Vans</button>
+    </div>
+    <span class="hint mono" id="hint">Zoom in for places</span>
+  </div>
+
+  <button class="raise" id="raise" type="button" aria-label="Pledge">
+    <span class="t"><span class="mono" id="raiseL">Pledge challenge</span><b id="raiseB">Scan to pledge</b><u>Make a pledge</u></span>
+    <span class="qr" data-qr></span>
+  </button>
+
+  <aside class="panel" id="panel" aria-hidden="true" aria-labelledby="pE">
+    <div class="ph"><span class="mono" id="pE"></span><button class="x" id="pX" type="button" aria-label="Close">✕</button></div>
+    <div class="pb" id="pB"></div>
+  </aside>
+</main>
+
+<div class="dock">
+  <div class="strip" id="strip" aria-label="Runners and support vans"></div>
+  <button class="btn ghost" id="allRunners" type="button">Runners</button>
+  <button class="btn two" id="pledge" type="button"><small id="pledgeS" hidden></small><span>Make a pledge</span></button>
+</div>
+
+<footer class="partners" aria-label="Partners"><div class="marq"><div class="track" id="pSupp"></div></div></footer>
+
+<script src="../assets/js/race.js"></script>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/lake.js"></script>
+<script src="places.js"></script>
+<script>
+/* =====================================================================
+   CONFIG — the block to edit. Places along the route are in places.js.
+   Schedule, stations, join points and route are NOT here: they come from
+   ../assets/js/race.js, shared with the race-ops site.
+   ===================================================================== */
+const CONFIG = {
+  // Live positions (runners and vans). URL that returns JSON positions (see backend/Tracker.gs).
+  // Empty = the map shows the planned position from the schedule.
+  feedUrl: '',
+  pollSec: 20,          // how often to ask the feed
+  staleMin: 12,         // no signal for this long = "last seen"
+  site: 'https://dgompe.github.io/charity-ultra/',
+  photos: 'https://dgompe.github.io/charity-ultra/assets/runners/',
+  // Pledges: the same Google Sheet backend as the main site. Read-only, totals only.
+  pledgeEndpoint: 'https://script.google.com/macros/s/AKfycbwV4ssz_plzEkojwrkFqi7vxsZlgv6p8beLgqzianswYfF0MURM2fPfeE6L4UvyWbiB/exec',
+  pledgeUrl: 'https://dgompe.github.io/charity-ultra/#pledge-form',   // the QR code points here
+  streets: true,        // show street detail when zoomed in close
+  // tracker: the id, bib or device name the tracker provider uses. Empty = match by name.
+  runners: [
+    { name: 'David Gomez Pereda', img: 'david-gomez-pereda.jpg', tracker: '', bio: 'Grew up between Spain and the US. Doctor. Obese as a kid, more at home with paint than a ball. Sport got me out, and into hard things.' },
+    { name: 'Michele Gaeta', img: 'michele-gaeta.jpg', tracker: '', bio: 'Sport has always been part of my life, and it has shaped who I am and how I face challenges. I started cycling at 14 and spent years racing.' },
+    { name: 'Francis Pfluger', img: 'francis-pfluger.jpg', tracker: '', bio: 'I’ve always been drawn to adventure and love to compete. Being a father, husband, son, friend, employee and so on, running, especially in the mountains, still gives me a chance to do both. Today I mostly compete with my younger self, but I like that it keeps me in shape so I can keep up with my kids.' },
+    { name: 'Clarinde Esculier', img: 'clarinde-esculier.jpg', tracker: '', bio: 'I grew up across three continents and trained as a doctor. Wherever life has taken me, the mountains and nature have been a place where I find peace and reconnect with myself.' },
+    { name: 'Arthur Wong', img: 'arthur-wong.jpg', tracker: '', bio: 'I used to run to get more in touch with myself. Listening, having conversations between the heart, the body and the mind: a status check, a detox, a fitness enhancement. One runs quick, but time slows down. I still do that today.' },
+    { name: 'Marthinus Erasmus', img: 'marthinus-erasmus.jpg', tracker: '', bio: 'This year I signed up for the Stray 100, a 100-mile race around Lake Geneva. I always knew a 100-miler in one go was in my future. I just didn’t expect it to be this year, because twelve months ago I couldn’t run at all.' },
+    { name: 'Angela Gisler', img: 'angela-gisler-2.jpg', tracker: '', bio: 'Running offers me resonance in many different ways: sometimes the opportunity to push my limits, sometimes peace and recovery.' },
+    { name: 'Vincent Leroy', img: 'vincent-leroy-4k.jpg', tracker: '', bio: 'Nine years in Switzerland, here for the mountains and the challenge. I see the lake every day. Now I want to run around it.' },
+  ],
+  vehicles: [
+    { name: 'Sprinter', emoji: '🚐', tracker: '', role: 'Race van' },
+    { name: 'Van A', emoji: '🚐', tracker: '', role: 'Support van' },
+    { name: 'Van B', emoji: '🚐', tracker: '', role: 'Support van' },
+  ],
+  mainPartners: [
+    { name: 'Mount to Coast', logo: 'mount-to-coast', url: 'https://ch.mounttocoast.com/' },
+    { name: 'IMD', logo: 'imd', url: 'https://www.imd.org/' },
+  ],
+  supporters: [
+    ['COROS', 'coros', 'https://coros.com'], ['SEMS', 'sems', 'https://sems.ch'], ['PEAQ', 'peaq', 'https://peaqhydration.com'],
+    ['Compressport', 'compressport', 'https://compressport.com'], ['Vitamin Well', 'vitamin-well', 'https://vitaminwell.com'],
+    ['S-Rehab', 's-rehab', 'https://s-rehab.ch'], ['LEKI', 'leki', 'https://leki.com'], ['Poltrax', 'poltrax', 'https://poltrax.live/en'],
+    ['HydraPak', 'hydrapak', 'https://hydrapak.com'], ['CGN', 'cgn', 'https://cgn.ch'], ['YETI', 'yeti', 'https://yeti.com'],
+    ['Lime', 'lime', 'https://li.me'], ['Compex', 'compex', 'https://compex.com'], ['Condecta', 'condecta', 'https://condecta.ch'],
+    ['New Roots', 'new-roots', 'https://newroots.ch'], ['Patagonia', 'patagonia', 'https://eu.patagonia.com/ch/'],
+    ['Leukotape', 'leukotape', 'https://leukotape.com/ch/de/produkte'], ['Europcar', 'europcar', 'https://europcar.ch'], ['Maysun', 'maysun', ''],
+  ],
+  // Public points on the last section, in km before the finish. A13 (St-Sulpice) is the last-5-km point already.
+  lastKm: [2, 1],
+  sunset: '16:50', sunrise: '07:55',
+};
+
+(() => {
+'use strict';
+const R = window.RACE, ST = R.stations, FIN = ST[ST.length - 1], P = R.route;
+const $ = s => document.querySelector(s);
+const OFF = 3600e3, MIN = 60e3, DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const pad = n => String(n).padStart(2, '0');
+const hm = ms => { const d = new Date(ms + OFF); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); };
+const day = ms => DAYS[new Date(ms + OFF).getUTCDay()];
+const fmt = ms => day(ms) + ' ' + hm(ms);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dur = ms => { const m = Math.max(0, Math.round(ms / MIN)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + pad(m % 60); };
+const place = s => s.id === 'START' || s.id === 'FIN' ? 'IMD' : s.id;
+const chf = n => 'CHF ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '’');
+
+/* ---------- clock (real, ?t=… frozen, or ?demo fast-forward) ---------- */
+const Q = new URLSearchParams(location.search);
+const DEMO = Q.has('demo');
+const T0 = Q.get('t') ? Date.parse(Q.get('t').length <= 16 ? Q.get('t') + ':00+01:00' : Q.get('t')) : null;
+const BOOT = Date.now(), SPEED = Number(Q.get('speed')) || 400;
+const now = () => DEMO ? R.start - 20 * MIN + (Date.now() - BOOT) * SPEED : (T0 || Date.now());
+
+/* ---------- plan maths (same rules as the race-ops site) ---------- */
+function planAt(t) {
+  if (t < R.start) return { state: 'pre', km: 0 };
+  if (t >= FIN.arr) return { state: 'done', km: R.routeKm };
+  for (let i = 0; i < ST.length - 1; i++) {
+    const a = ST[i], b = ST[i + 1];
+    if (a.arr && t >= a.arr && t < a.dep) return { state: 'stop', st: a, km: a.km, next: b, i };
+    if (t >= a.dep && t < b.arr) return { state: 'run', from: a, to: b, i, sec: 'S' + (i + 1), km: a.km + (t - a.dep) / (b.arr - a.dep) * (b.km - a.km) };
+  }
+  return { state: 'done', km: R.routeKm };
+}
+function timeAtKm(k) { // when the plan passes km k
+  for (let i = 0; i < ST.length - 1; i++) { const a = ST[i], b = ST[i + 1]; if (k <= b.km) return a.dep + (k - a.km) / (b.km - a.km) * (b.arr - a.dep); }
+  return FIN.arr;
+}
+function pointAtKm(k) {
+  if (k <= 0) return P[0].slice(0, 2); if (k >= P[P.length - 1][3]) return P[P.length - 1].slice(0, 2);
+  let lo = 0, hi = P.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m][3] <= k) lo = m; else hi = m; }
+  const a = P[lo], b = P[hi], f = (k - a[3]) / ((b[3] - a[3]) || 1);
+  return [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])];
+}
+const COS = Math.cos(46.4 * Math.PI / 180);
+const metres = (la1, lo1, la2, lo2) => Math.hypot((la1 - la2) * 111320, (lo1 - lo2) * 111320 * COS);
+function kmOf(lat, lon, hint) { // GPS fix -> km on the route. hint settles the spots the route passes twice.
+  let best = 0, bs = Infinity;
+  for (let i = 0; i < P.length; i++) { const s = metres(lat, lon, P[i][0], P[i][1]) + Math.abs(P[i][3] - hint) * 20; if (s < bs) { bs = s; best = i; } }
+  let km = P[best][3];
+  [[best - 1, best], [best, best + 1]].forEach(([i, j]) => {
+    if (i < 0 || j >= P.length) return; const a = P[i], b = P[j];
+    const ax = (lon - a[1]) * COS, ay = lat - a[0], bx = (b[1] - a[1]) * COS, by = b[0] - a[0], L = bx * bx + by * by; if (!L) return;
+    const f = (ax * bx + ay * by) / L; if (f > 0 && f < 1) km = a[3] + f * (b[3] - a[3]);
+  });
+  return { km, off: metres(lat, lon, P[best][0], P[best][1]) };
+}
+const hmToMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+const SUNSET = hmToMin(CONFIG.sunset), SUNRISE = hmToMin(CONFIG.sunrise);
+const isDark = ms => { const d = new Date(ms + OFF), m = d.getUTCHours() * 60 + d.getUTCMinutes(); return m >= SUNSET || m < SUNRISE; };
+const light = (a, b) => isDark(a) && isDark(b) ? 'Dark' : !isDark(a) && !isDark(b) ? 'Daylight' : 'Partly dark';
+
+/* ---------- points on the map ---------- */
+const POINTS = [];
+ST.forEach((s, i) => {
+  if (s.id === 'FIN') return;
+  const sub = (s.sub || '').replace(/^Regroup · /, '');
+  POINTS.push({ id: s.id, kind: s.id === 'START' ? 'se' : 'st', i, lat: s.lat, lon: s.lon, km: s.km, t: s.arr || s.dep, short: s.id === 'START' ? 'IMD' : s.id, big: s.big, join: s.final ? 'last' : null,
+    extra: s.id === 'START' ? 'Start · finish' : [sub, 'dep ' + hm(s.dep)].filter(Boolean).join(' · ') });
+});
+(R.waypoints || []).filter(w => w.join).forEach(w => POINTS.push({ id: 'J' + Math.round(w.km), kind: 'join', lat: w.lat, lon: w.lon, km: w.km, t: timeAtKm(w.km), short: w.name.replace(/\s*start$/i, ''), name: w.name, join: 'pack', extra: 'join the pack' }));
+CONFIG.lastKm.forEach(n => { const km = R.routeKm - n, p = pointAtKm(km); POINTS.push({ id: 'L' + n, kind: 'join', lat: p[0], lon: p[1], km, t: timeAtKm(km), short: 'Last ' + n + ' km', name: 'Last ' + n + ' km', join: 'last', toGo: n, extra: 'run along or follow by bike' }); });
+const JOINS = POINTS.filter(p => p.join).sort((a, b) => a.km - b.km);
+const PLACES = (window.PLACES || []).map(p => { const k = kmOf(p.lat, p.lon, p.km); return { ...p, kind: 'poi', rkm: k.km, t: timeAtKm(k.km) }; });
+
+/* ---------- map: a tilted panorama of the lake, Alps on the horizon ---------- */
+const mapEl = $('#map'), wrap = $('.mapwrap');
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const lats = P.map(p => p[0]), lons = P.map(p => p[1]);
+const BOX = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
+const MID = [(BOX[0][0] + BOX[1][0]) / 2, (BOX[0][1] + BOX[1][1]) / 2];
+const PHONE = () => innerWidth <= 720;
+const CALM = matchMedia('(prefers-reduced-motion:reduce)').matches;
+const VIEWS = { pano: { bearing: 132, pitch: 54 }, flat: { bearing: 0, pitch: 0 } };
+let MODE = Q.get('view') === 'flat' ? 'flat' : 'pano';
+const G = ll => [ll[1], ll[0]];
+const Z = () => map.getZoom() + 1; // zoom on the usual web-map scale, used by places.js
+let READY = false;
+
+if (!(() => { try { const c = document.createElement('canvas'); return c.getContext('webgl2') || c.getContext('webgl'); } catch { return null; } })()) mapEl.innerHTML = '<p style="padding:160px 24px 24px;max-width:420px">This map needs WebGL. Open the page in an up-to-date browser. The schedule is on the race info page.</p>';
+const map = new maplibregl.Map({ container: 'map', attributionControl: false, fadeDuration: 0, minZoom: 6.5, maxZoom: 16.5, maxPitch: 66,
+  center: MID, zoom: 7.2, pitch: 0, bearing: 0,
+  style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': css('--land') } }] } });
+map.touchZoomRotate.enable(); map.keyboard.enable();
+if (Q.has('debug')) window._map = map;
+
+function fitPad() {
+  const nowEl = $('#now');
+  return PHONE() ? { top: nowEl.offsetTop + nowEl.offsetHeight - mapEl.offsetTop + 34, left: 56, right: 56, bottom: 74 } : { top: 60, left: innerWidth > 1100 ? 384 : 60, right: 84, bottom: 100 };
+}
+let FIT = false;
+function camFor() { // the camera that puts the whole loop inside the free part of the screen, tilt included
+  const v = VIEWS[MODE], pad = fitPad(), W = mapEl.clientWidth, H = mapEl.clientHeight;
+  const keep = { center: map.getCenter(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
+  FIT = true; map.stop(); map.jumpTo({ center: MID, zoom: 9, bearing: v.bearing, pitch: v.pitch });
+  for (let n = 0; n < 7; n++) {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (let i = 0; i < LL.length; i += 3) { const q = map.project(LL[i]); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+    const k = Math.min((W - pad.left - pad.right) / (x1 - x0), (H - pad.top - pad.bottom) / (y1 - y0));
+    const c = map.unproject([W / 2 + (x0 + x1) / 2 - (pad.left + W - pad.right) / 2, H / 2 + (y0 + y1) / 2 - (pad.top + H - pad.bottom) / 2]);
+    map.jumpTo({ center: c, zoom: map.getZoom() + Math.log2(k) * .85 });
+  }
+  const out = { center: map.getCenter(), zoom: map.getZoom(), bearing: v.bearing, pitch: v.pitch };
+  map.jumpTo(keep); FIT = false; return out;
+}
+function fitAll(ms = 1400) { wrap.classList.toggle('flat', MODE === 'flat'); map.resize(); const c = camFor(); if (ms && !CALM) map.flyTo({ ...c, duration: ms, essential: true }); else { map.jumpTo(c); } }
+const offs = () => { const pn = $('#panel'); return PHONE() ? [0, -pn.offsetHeight / 2 + 40] : [-pn.offsetWidth / 2 + (innerWidth > 1100 ? 120 : 0), 40]; };
+const reveal = ll => map.easeTo({ center: G(ll), offset: offs(), duration: 600, essential: true });
+const focus = (ll, z) => map.flyTo({ center: G(ll), zoom: Math.max(map.getZoom(), z - 1), offset: offs(), duration: CALM ? 0 : 1100, essential: true });
+
+/* layers */
+const gj = (type, coordinates) => ({ type: 'Feature', properties: {}, geometry: { type, coordinates } });
+const LL = P.map(p => [p[1], p[0]]);
+function grid(step, box) { // purple grid in real space: it tilts with the map
+  const out = [], dLat = step, dLon = step / COS, [w, s, e, n] = box;
+  for (let x = Math.floor(w / dLon) * dLon; x <= e; x += dLon) out.push([[x, s], [x, n]]);
+  for (let y = Math.floor(s / dLat) * dLat; y <= n; y += dLat) out.push([[w, y], [e, y]]);
+  return gj('MultiLineString', out);
+}
+function paint() {
+  if (!READY) return;
+  const night = document.documentElement.classList.contains('night');
+  map.setPaintProperty('bg', 'background-color', css('--land'));
+  map.setPaintProperty('lake', 'fill-color', css('--lake'));
+  map.setPaintProperty('shore', 'line-color', css('--ink'));
+  map.setPaintProperty('wave', 'line-color', css('--ink'));
+  ['grid', 'grid2'].forEach(l => map.setPaintProperty(l, 'line-color', night ? '#a58cff' : '#5a3fc0'));
+  map.setPaintProperty('rt-case', 'line-color', css('--land'));
+  map.setPaintProperty('rt', 'line-color', css('--ink'));
+  map.setPaintProperty('rt-done', 'line-color', css('--ok'));
+  if (CONFIG.streets) {
+    if (map.getLayer('streets')) { map.removeLayer('streets'); map.removeSource('streets'); }
+    map.addSource('streets', { type: 'raster', tileSize: 256, minzoom: 0, maxzoom: 19, tiles: ['a', 'b', 'c', 'd'].map(s => `https://${s}.basemaps.cartocdn.com/${night ? 'dark_all' : 'light_all'}/{z}/{x}/{y}@2x.png`) });
+    map.addLayer({ id: 'streets', type: 'raster', source: 'streets', minzoom: 12, paint: { 'raster-saturation': -1, 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 12.4, .75] } }, 'lake');
+  }
+}
+map.on('load', () => {
+  const src = (id, data) => map.addSource(id, { type: 'geojson', data });
+  src('lake', gj('Polygon', [LAKE.map(G)])); src('wave', gj('LineString', LAKE2.map(G)));
+  src('grid', grid(.03, [5.2, 45.6, 7.9, 47.2])); src('grid2', grid(.0075, [BOX[0][0] - .12, BOX[0][1] - .1, BOX[1][0] + .12, BOX[1][1] + .1]));
+  src('rt', gj('LineString', LL)); src('done', gj('LineString', []));
+  const fade = ['interpolate', ['linear'], ['zoom'], 11.9, 1, 12.4, .22];
+  map.addLayer({ id: 'lake', type: 'fill', source: 'lake', paint: { 'fill-opacity': fade } });
+  map.addLayer({ id: 'shore', type: 'line', source: 'lake', paint: { 'line-width': 1.5, 'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.9, .9, 12.4, 0] } });
+  map.addLayer({ id: 'wave', type: 'line', source: 'wave', paint: { 'line-width': 1, 'line-dasharray': [2, 5], 'line-opacity': ['interpolate', ['linear'], ['zoom'], 11.9, .28, 12.4, 0] } });
+  map.addLayer({ id: 'grid', type: 'line', source: 'grid', paint: { 'line-width': 1, 'line-opacity': .2 } });
+  map.addLayer({ id: 'grid2', type: 'line', source: 'grid2', minzoom: 10.2, paint: { 'line-width': 1, 'line-opacity': .12 } });
+  const round = { 'line-join': 'round', 'line-cap': 'round' };
+  map.addLayer({ id: 'rt-case', type: 'line', source: 'rt', layout: round, paint: { 'line-width': 9, 'line-opacity': .9 } });
+  map.addLayer({ id: 'rt', type: 'line', source: 'rt', layout: round, paint: { 'line-width': 3.5 } });
+  map.addLayer({ id: 'rt-done', type: 'line', source: 'done', layout: round, paint: { 'line-width': 5.5 } });
+  READY = true; map.resize(); paint(); update(); fitAll(CALM || Q.has('t') || DEMO ? 0 : 2400);
+  let sized = mapEl.clientWidth + 'x' + mapEl.clientHeight;
+  new ResizeObserver(() => { const now2 = mapEl.clientWidth + 'x' + mapEl.clientHeight; if (now2 === sized) return; sized = now2; map.resize(); horizon(); if (!SEL && Date.now() - lastInput > 4000) fitAll(0); declutter(); }).observe(mapEl);
+});
+
+/* markers are plain HTML, so they stay upright and crisp while the map tilts */
+function mark(lat, lon, cls, html, z, title) {
+  const el = document.createElement('div'); el.className = cls; el.innerHTML = html; if (z != null) el.style.zIndex = z;
+  if (title) { el.title = title; el.tabIndex = 0; el.setAttribute('role', 'button'); }
+  return new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([lon, lat]).addTo(map);
+}
+let lastHit = 0;
+function tap(m, fn) { const el = m.getElement(); el.addEventListener('click', e => { e.stopPropagation(); lastHit = Date.now(); fn(); }); el.addEventListener('keydown', e => { if (e.key === 'Enter') fn(); }); }
+
+// decoration: names on the map, sails and swans on the lake, the CGN steamer crossing
+mark(46.452, 6.50, 'dc big', '<span>Lac Léman</span>', 1);
+mark(46.56, 6.52, 'dc', '<span>Suisse</span>', 1); mark(46.31, 6.62, 'dc', '<span>France</span>', 1);
+[[46.47, 6.74, '⛵'], [46.40, 6.42, '⛵'], [46.345, 6.26, '⛵'], [46.497, 6.60, '🦢'], [46.228, 6.165, '🦢'], [46.425, 6.86, '🦆']].forEach((d, i) => mark(d[0], d[1], 'dc em', `<i style="animation-delay:${-i * .7}s">${d[2]}</i>`, 2));
+const ferry = mark(46.50, 6.625, 'dc em ferry', '<i>⛴️</i>', 3);
+const FERRY = [[46.503, 6.626], [46.404, 6.592]]; // Lausanne-Ouchy ↔ Évian
+if (!CALM) setInterval(() => { const T = 150000, u = (Date.now() % T) / T, f = u < .5 ? u * 2 : 2 - u * 2, e = f * f * (3 - 2 * f); ferry.setLngLat([FERRY[0][1] + e * (FERRY[1][1] - FERRY[0][1]), FERRY[0][0] + e * (FERRY[1][0] - FERRY[0][0])]); }, 120);
+for (let k = 10; k < R.routeKm - 3; k += 10) { const p = pointAtKm(k); mark(p[0], p[1], 'kmk', `<span>km ${k}</span>`, 4); }
+
+// stations, join points
+POINTS.forEach(p => {
+  p.m = mark(p.lat, p.lon, `mk ${p.kind}${p.big ? ' big' : ''}`, `<span class="hit"></span><i class="dot"></i><span class="tag"><b>${p.id === 'START' ? '🏁 ' : ''}${esc(p.short)}</b><span class="tm">${hm(p.t)}</span>${p.extra ? `<span class="xt">${esc(p.extra)}</span>` : ''}</span>`, p.kind === 'join' ? 20 : 30, (p.name || p.short) + ' · ' + fmt(p.t));
+  tap(p.m, () => openPoint(p));
+});
+// places: emoji stickers that appear as people zoom in
+PLACES.forEach(p => {
+  p.m = mark(p.lat, p.lon, `poi${p.open === 'yes' ? ' yes' : ''}`, `<span class="hit"></span><i class="ic">${p.emoji || '📍'}</i><span class="lbl"><b>${esc(p.name)}</b><em>${esc(p.tag)}</em></span>`, 10, p.name);
+  p.m.remove(); p.on = false; tap(p.m, () => openPlace(p));
+});
+function zoomState() {
+  const z = Z();
+  mapEl.classList.toggle('z-far', z < 9.4); mapEl.classList.toggle('z-lbl', z >= 11.25); mapEl.classList.toggle('z-info', z >= 12.5);
+  const street = CONFIG.streets && z >= 13.2; mapEl.classList.toggle('z-street', street);
+  $('#hint').textContent = street ? '© OpenStreetMap © CARTO' : 'Zoom in for places · drag with two fingers or right mouse to turn';
+  PLACES.forEach(p => { const on = z >= p.zoom || SEL === p.id; if (on && !p.on) { p.m.addTo(map); p.on = true; } if (!on && p.on) { p.m.remove(); p.on = false; } });
+}
+function sides() { // labels sit on the outer side of the lake, whichever way the map is turned
+  const c = map.project([6.50, 46.42]);
+  [...POINTS, ...PLACES].forEach(p => { const el = p.m.getElement(); el.classList.toggle('l', map.project([p.lon, p.lat]).x < c.x); });
+}
+function declutter() { // hide labels that would overlap; dots and stickers stay
+  const items = [];
+  POINTS.forEach(p => { const el = p.m.getElement(); items.push({ el, t: el.querySelector('.tag'), r: (el.classList.contains('next') || el.classList.contains('sel') ? 0 : p.kind === 'se' ? 1 : p.join === 'last' ? 2 : p.big ? 3 : p.kind === 'st' ? 4 : 5) + (el.classList.contains('past') ? 3 : 0) }); });
+  PLACES.forEach(p => { if (p.on) { const el = p.m.getElement(); items.push({ el, t: el.querySelector('.lbl'), r: el.classList.contains('sel') ? 0 : p.open === 'yes' ? 6 : 9 }); } });
+  const kept = ['#now', '#legend', '#raise', '#ctl', '#pano'].map(q => $(q)).filter(e => e && e.offsetParent).map(e => e.getBoundingClientRect());
+  const box = mapEl.getBoundingClientRect();
+  PLACES.forEach(p => { if (p.on) { const ic = p.m.getElement().querySelector('.ic'); if (ic.offsetParent) kept.push(ic.getBoundingClientRect()); } });
+  document.querySelectorAll('.pk .stack').forEach(e => kept.push(e.getBoundingClientRect()));
+  items.sort((a, b) => a.r - b.r).forEach(o => {
+    o.t.classList.remove('hide'); const r = o.t.getBoundingClientRect(); if (!r.width) return;
+    if (!o.el.classList.contains('sel') && (r.left < box.left + 2 || r.right > box.right - 2 || kept.some(k => !(r.right + 3 < k.left || r.left - 3 > k.right || r.bottom + 3 < k.top || r.top - 3 > k.bottom)))) o.t.classList.add('hide'); else kept.push(r);
+  });
+}
+map.on('moveend', () => { if (FIT) return; zoomState(); sides(); drawPack(); declutter(); });
+map.on('click', () => { if (Date.now() - lastHit > 80) close(); });
+addEventListener('resize', () => { map.resize(); horizon(); declutter(); });
+$('#legend').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); mapEl.classList.toggle('no-' + b.dataset.k, !on); declutter(); });
+
+/* controls */
+$('#cIn').onclick = () => map.zoomIn(); $('#cOut').onclick = () => map.zoomOut();
+$('#cFit').onclick = () => fitAll(900);
+$('#cFind').onclick = () => { if (PACK.length) map.flyTo({ center: G(PACK[0].ll), zoom: Math.max(map.getZoom(), 12.3), pitch: MODE === 'pano' ? 58 : 0, duration: CALM ? 0 : 1400, essential: true }); };
+$('#cView').onclick = () => { MODE = MODE === 'pano' ? 'flat' : 'pano'; $('#cView').textContent = MODE === 'pano' ? '2D' : '3D'; $('#cView').title = MODE === 'pano' ? 'Flat map, north up' : 'Panorama with the Alps'; fitAll(1200); };
+$('#cView').textContent = MODE === 'pano' ? '2D' : '3D';
+
+/* the horizon: every peak sits at its true bearing from the lake, so the range slides as the map turns */
+const PEAKS = [['Moléson', 73, 2002], ['Rochers-de-Naye', 93, 2042], ['Les Diablerets', 108, 3210], ['Grammont', 117, 2172], ['Dent d’Oche', 127, 2221], ['Dents du Midi', 139, 3257], ['Mont Blanc', 161, 4806], ['Les Voirons', 198, 1480], ['Salève', 216, 1379], ['La Dôle', 265, 1677], ['Mont Tendre', 311, 1679]];
+const dAz = (a, b) => { let d = (a - b) % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; };
+function ridge(az, H, k) {
+  const alps = Math.max(0, 1 - Math.abs(dAz(az, 125)) / 85);
+  let y = H * (.07 + .16 * alps) + H * .035 * (Math.sin(az * 1.9 * k) + .6 * Math.sin(az * 4.7 * k + 1.3) + .35 * Math.sin(az * 11.3 * k + 2.1)) * (.5 + alps);
+  PEAKS.forEach(p => { const d = dAz(az, p[1]), w = 2.2 + p[2] / 1400; y += (p[2] - 600) / 4300 * H * .8 * k * Math.exp(-(d * d) / (w * w)) * (1 - .22 * Math.abs(Math.sin(d * 2.3 + p[1]))); });
+  return Math.max(2, y);
+}
+function horizon() {
+  const el = $('#pano'); if (!el || MODE === 'flat' || FIT) return;
+  const W = el.clientWidth, H = el.clientHeight, b = map.getBearing(), hf = 2 * Math.atan(Math.tan(18.43 * Math.PI / 180) * mapEl.clientWidth / mapEl.clientHeight) * 180 / Math.PI, ppd = W / hf;
+  const path = (k, yb) => { let d = `M0 ${H}`; for (let x = 0; x <= W + 6; x += 6) d += `L${x} ${(H - ridge(b + (x - W / 2) / ppd, yb, k)).toFixed(1)}`; return d + `L${W} ${H}Z`; };
+  const snowT = H * .5; let snow = '';
+  for (let x = 0, run = null; x <= W + 3; x += 3) { const y = ridge(b + (x - W / 2) / ppd, H * .92, 1); if (y > snowT) { (run = run || []).push([x, y]); } if ((y <= snowT || x > W) && run) { snow += 'M' + run.map(q => `${q[0]} ${(H - q[1]).toFixed(1)}`).join('L') + 'L' + run.slice().reverse().map((q, i) => `${q[0]} ${(H - snowT - (i % 2 ? 0 : 3)).toFixed(1)}`).join('L') + 'Z'; run = null; } }
+  $('#panoSvg').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  $('#panoSvg').innerHTML = `<path class="far" d="${path(1, H * .92)}"/><path class="snow" d="${snow}"/><path class="near" d="${path(.42, H * .6)}"/>`;
+  let h = '', used = [];
+  PEAKS.slice().sort((a, c) => c[2] - a[2]).forEach(p => { const x = W / 2 + dAz(p[1], b) * ppd; if (x < 50 || x > W - 50 || used.some(u => Math.abs(u - x) < (PHONE() ? 92 : 124)) || (PHONE() && p[2] < 2500)) return; used.push(x); h += `<span style="left:${x.toFixed(0)}px;bottom:${Math.min(H - 26, ridge(p[1], H * .92, 1) + 5).toFixed(0)}px"><b>${p[0]}</b> ${p[2]}</span>`; });
+  $('#panoLbl').innerHTML = h;
+}
+map.on('rotate', horizon); map.on('load', horizon);
+
+/* a slow sway while nobody touches the map, so the range drifts behind the lake */
+let lastInput = Date.now(), swayDir = 1, swaying = false, swayBase = 0;
+['mousedown', 'touchstart', 'wheel', 'keydown'].forEach(ev => addEventListener(ev, () => { lastInput = Date.now(); swaying = false; }, { passive: true }));
+if (!CALM) setInterval(() => {
+  if (!READY || MODE !== 'pano' || SEL || document.hidden || Date.now() - lastInput < 25000 || Z() > 11.6) { swaying = false; return; }
+  if (!swaying) swayBase = map.getBearing();
+  swaying = true; swayDir = -swayDir;
+  map.easeTo({ bearing: swayBase + swayDir * 3, duration: 11500, easing: t => t * t * (3 - 2 * t) });
+}, 12000);
+
+/* ---------- runners and vans: live feed, or plan when there is none ---------- */
+const RUN = CONFIG.runners.map((r, i) => ({ ...r, i, first: r.name.split(' ')[0], thumb: 'runners/' + r.img, photo: CONFIG.photos + r.img, km: 0, ll: null, src: 'plan', ts: 0 }));
+const VAN = CONFIG.vehicles.map((v, i) => ({ ...v, i, ll: null, ts: 0, stale: false }));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+let FEED = { ok: false, at: 0, rows: [] };
+
+function readFeed(j) { // accepts the Tracker.gs shape, plain arrays, common wrappers and GeoJSON
+  let a = Array.isArray(j) ? j : j.positions || j.participants || j.runners || j.devices || j.data || j.items ||
+    (j.features ? j.features.map(f => ({ ...f.properties, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] })) : []);
+  if (!Array.isArray(a)) a = Object.values(a);
+  const num = v => v == null || v === '' ? NaN : Number(v);
+  const time = v => { if (v == null || v === '') return 0; if (typeof v === 'number' || /^\d+(\.\d+)?$/.test(v)) { const n = Number(v); return n < 1e11 ? n * 1000 : n; } const t = Date.parse(v); return isNaN(t) ? 0 : t; };
+  return a.map(o => {
+    const p = o.position || o.lastPosition || o.last || o.location || o.gps || o;
+    return { id: String(o.id ?? o.tracker ?? o.bib ?? o.number ?? o.device ?? o.deviceId ?? o.imei ?? ''), name: String(o.name ?? o.fullName ?? o.participant ?? o.label ?? [o.firstName, o.lastName].filter(Boolean).join(' ')),
+      lat: num(p.lat ?? p.latitude ?? p.y), lon: num(p.lon ?? p.lng ?? p.long ?? p.longitude ?? p.x),
+      ts: time(p.ts ?? p.time ?? p.timestamp ?? p.updated ?? p.updatedAt ?? p.date ?? o.ts ?? o.time ?? o.timestamp), speed: num(p.speed ?? o.speed), battery: num(p.battery ?? o.battery) };
+  }).filter(r => isFinite(r.lat) && isFinite(r.lon) && Math.abs(r.lat) <= 90);
+}
+function demoFeed(t) { // simulated trackers: a pack a few minutes behind plan, vans leap-frogging the stations
+  if (t < R.start || t > FIN.arr + 20 * MIN) return [];
+  const rows = RUN.map((r, i) => { const k = planAt(t - (5 + (i % 4)) * MIN).km, p = pointAtKm(Math.max(0, k)); return { id: 'D' + i, name: r.name, lat: p[0] + ((i * 37) % 7 - 3) * 2e-5, lon: p[1], ts: t - i * 3000, speed: 7.4 }; });
+  const pk = planAt(t).km, ni = ST.findIndex(s => s.km > pk);
+  const at = (name, ll) => rows.push({ id: name, name, lat: ll[0] + 4e-4, lon: ll[1] + 4e-4, ts: t - 20000 });
+  at('Sprinter', pointAtKm(Math.max(0, pk - 1.2)));
+  if (ni > 0) { at('Van A', [ST[ni].lat, ST[ni].lon]); const s2 = ST[Math.min(ni + 1, ST.length - 1)]; at('Van B', [s2.lat, s2.lon]); }
+  return rows;
+}
+async function poll() {
+  try {
+    let rows;
+    if (DEMO) rows = demoFeed(now());
+    else { if (!CONFIG.feedUrl) return; const r = await fetch(CONFIG.feedUrl + (CONFIG.feedUrl.includes('?') ? '&' : '?') + '_=' + Math.floor(Date.now() / 1e4), { cache: 'no-store' }); if (!r.ok) throw 0; rows = readFeed(await r.json()); }
+    FEED = { ok: true, at: Date.now(), rows };
+  } catch { FEED.ok = false; }
+  update();
+}
+function matchRow(r, rows, loose) {
+  const ids = [].concat(r.tracker || []).map(String).filter(Boolean);
+  if (ids.length) { const hit = rows.find(x => ids.includes(x.id) || ids.some(i => norm(x.name) === norm(i))); if (hit) return hit; }
+  const n0 = norm(r.name), parts = n0.split(' ');
+  return rows.find(x => { const n = norm(x.name); return n && (n === n0 || (loose ? n.includes(n0) : n.includes(parts[0]) && n.includes(parts[parts.length - 1]))); });
+}
+
+let PACK = [], LIVE = false, DELTA = null, PACKKM = 0, SEL = null;
+let packMk = [], vanMk = [], packKey = '', vanKey = '';
+
+function update() {
+  const t = now(), plan = planAt(t), planLL = pointAtKm(plan.km);
+  const fresh = FEED.ok && (DEMO || Date.now() - FEED.at < 3 * CONFIG.pollSec * 1000);
+  let live = 0;
+  RUN.forEach(r => {
+    const row = fresh ? matchRow(r, FEED.rows) : null;
+    if (row) { const k = kmOf(row.lat, row.lon, r.src === 'live' ? r.km : plan.km); r.km = k.km; r.ll = [row.lat, row.lon]; r.ts = row.ts; r.speed = row.speed; r.src = 'live'; r.stale = row.ts ? t - row.ts > CONFIG.staleMin * MIN : false; if (!r.stale) live++; }
+    else { r.km = plan.km; r.ll = planLL; r.src = 'plan'; r.ts = 0; r.stale = false; }
+  });
+  VAN.forEach(v => { const row = fresh ? matchRow(v, FEED.rows, true) : null; if (row) { v.ll = [row.lat, row.lon]; v.ts = row.ts; v.stale = row.ts ? t - row.ts > CONFIG.staleMin * MIN : false; } else if (!fresh) v.ll = null; });
+  LIVE = live > 0;
+  const liveKm = RUN.filter(r => r.src === 'live' && !r.stale).map(r => r.km).sort((a, b) => a - b);
+  PACKKM = LIVE ? liveKm[liveKm.length >> 1] : plan.km;
+  const newest = Math.max(0, ...RUN.filter(r => r.src === 'live').map(r => r.ts));
+  DELTA = LIVE && newest && PACKKM > .3 && PACKKM < R.routeKm - .1 && !ST.some(s => Math.abs(s.km - PACKKM) < .25) ? Math.round((newest - timeAtKm(PACKKM)) / MIN) : null;
+
+  const chip = $('#chip'); chip.className = 'chip mono' + (LIVE ? ' live' : '') + (DEMO ? ' demo' : '');
+  $('#chipT').textContent = (DEMO ? 'Demo · ' : '') + (LIVE ? 'Live · satellite' : 'By schedule');
+  chip.title = LIVE ? 'Positions from the satellite trackers.' : 'Positions calculated from the race schedule. The pack can run a few minutes early or late.';
+
+  const k = plan.state === 'pre' ? 0 : PACKKM;
+  if (READY) map.getSource('done').setData(gj('LineString', k > 0 ? P.filter(p => p[3] <= k).map(p => [p[1], p[0]]).concat([G(pointAtKm(k))]) : []));
+  $('#prog').style.width = (k / R.routeKm * 100).toFixed(2) + '%';
+
+  const nextSt = plan.state === 'pre' ? ST[0] : ST.find(s => s.km > PACKKM + .05) || FIN;
+  POINTS.forEach(p => {
+    const el = p.m.getElement(); if (!el) return;
+    const past = plan.state !== 'pre' && (plan.state === 'done' || p.km < PACKKM - .05) && p.id !== 'START';
+    const isNext = plan.state !== 'pre' && plan.state !== 'done' && p.kind === 'st' && p.id === nextSt.id;
+    el.classList.toggle('past', past); el.classList.toggle('next', isNext); el.classList.toggle('sel', SEL === p.id);
+    p.est = isNext && DELTA != null && Math.abs(DELTA) >= 3 ? p.t + DELTA * MIN : null;
+    el.querySelector('.tm').textContent = p.id === 'START' && plan.state !== 'pre' ? hm(FIN.arr) : (p.est ? '~' + hm(p.est) : hm(p.t));
+  });
+  drawPack(plan); drawVans(); nowCard(t, plan, nextSt); strip(plan); if (!swaying) declutter();
+  if (SEL && PANEL) PANEL();
+}
+
+function drawPack(plan) {
+  plan = plan || planAt(now());
+  const key = map.getZoom().toFixed(2) + (swaying ? '' : map.getBearing().toFixed(0) + map.getPitch().toFixed(0)) + plan.state + RUN.map(r => r.src + (r.stale ? 's' : '') + (r.ll ? r.ll[0].toFixed(5) + r.ll[1].toFixed(5) : '')).join();
+  if (key === packKey) return; packKey = key;
+  packMk.forEach(m => m.remove()); packMk = []; PACK = [];
+  const pts = RUN.filter(r => r.ll).map(r => ({ r, px: map.project(G(r.ll)) }));
+  pts.sort((a, b) => b.r.km - a.r.km).forEach(o => { const g = PACK.find(g => Math.hypot(g.px.x - o.px.x, g.px.y - o.px.y) < 48 && g.src === o.r.src); if (g) g.rs.push(o.r); else PACK.push({ px: o.px, ll: o.r.ll, src: o.r.src, rs: [o.r] }); });
+  PACK.forEach(g => {
+    const show = g.rs.slice(0, g.rs.length > 3 ? 2 : 3), more = g.rs.length - show.length;
+    const cap = g.src === 'plan' ? (plan.state === 'pre' ? 'Start ' + fmt(R.start) : plan.state === 'done' ? 'Finished' : 'By schedule') : g.rs.every(r => r.stale) ? 'Last seen ' + hm(Math.max(...g.rs.map(r => r.ts))) : '';
+    const m = mark(g.ll[0], g.ll[1], 'pk ' + g.src, `<i class="ring"></i><span class="stack">${show.map(r => `<i class="av" style="background-image:url(${r.thumb})"></i>`).join('')}${more > 0 ? `<i class="more">+${more}</i>` : ''}</span>${cap ? `<span class="cap">${cap}</span>` : ''}`, 100, g.rs.map(r => r.name).join(', '));
+    tap(m, () => g.rs.length === 1 ? openRunner(g.rs[0]) : openList(g.rs, g.src === 'plan' ? 'The pack' : 'Runners here'));
+    packMk.push(m);
+  });
+}
+function drawVans() {
+  const key = VAN.map(v => (v.ll ? v.ll[0].toFixed(5) + v.ll[1].toFixed(5) : '-') + (v.stale ? 's' : '')).join(); if (key === vanKey) return; vanKey = key;
+  vanMk.forEach(m => m.remove()); vanMk = [];
+  VAN.filter(v => v.ll).forEach(v => {
+    const m = mark(v.ll[0], v.ll[1], 'van' + (v.stale ? ' stale' : ''), `<span class="hit"></span><i class="box">${v.emoji || '🚐'}</i><span class="nm">${esc(v.name)}</span>`, 70, v.name);
+    tap(m, () => openVan(v)); vanMk.push(m);
+  });
+}
+function vanLine(v) {
+  if (!v.ll) return 'No signal yet';
+  const near = ST.map(s => ({ s, d: metres(v.ll[0], v.ll[1], s.lat, s.lon) })).sort((a, b) => a.d - b.d)[0];
+  return (near.d < 400 ? 'At ' + place(near.s) : (near.d / 1000).toFixed(1) + ' km from ' + place(near.s)) + (v.ts ? ' · ' + (v.stale ? 'last seen ' : 'signal ') + hm(v.ts) : '');
+}
+
+function nowCard(t, plan, nextSt) {
+  const E = $('#nowE'), H = $('#nowH'), Pp = $('#nowP'), D = $('#nowD'), ck = $('#ck'), ckL = $('#ckL');
+  const hms = ms => { const s = Math.floor(ms / 1000); return pad(Math.floor(s / 3600)) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60); };
+  if (plan.state === 'pre') {
+    const ms = R.start - t, d = Math.floor(ms / 864e5);
+    ckL.textContent = 'Start in'; ck.textContent = (d ? d + 'd ' : '') + hms(ms % 864e5);
+    E.textContent = 'Before the start'; H.textContent = 'Sat 28.11 · 11:00'; Pp.textContent = 'Start and finish at IMD, Lausanne. ' + R.routeKm.toFixed(1) + ' km around Lac Léman. Tap a point for times.';
+  } else if (plan.state === 'done') {
+    ckL.textContent = 'Finished'; ck.textContent = hms(FIN.arr - R.start);
+    E.textContent = 'Finished'; H.textContent = 'Back at IMD'; Pp.textContent = 'The pack closed the loop on Sunday at ' + hm(FIN.arr) + '. Thank you for following.';
+  } else {
+    ckL.textContent = 'Race clock'; ck.textContent = hms(t - R.start);
+    const km = PACKKM, i = Math.max(0, ST.findIndex(s => s.km > km + .05) - 1), a = ST[i], b = ST[i + 1] || FIN;
+    const atStop = !LIVE ? plan.state === 'stop' : Math.abs(a.km - km) < .25 && a.dep && t < a.dep + 5 * MIN;
+    E.textContent = LIVE ? 'Now · live' : 'Now · by schedule';
+    if (atStop) { const s = LIVE ? a : plan.st; H.textContent = 'At ' + place(s) + (s.sub ? ' · ' + s.sub.replace(/^Regroup · /, '') : ''); Pp.textContent = 'Aid stop. Departs ' + hm(s.dep) + '. Km ' + s.km.toFixed(1) + ' of ' + R.routeKm.toFixed(1) + '.'; }
+    else { const eta = nextSt.arr + (DELTA != null && Math.abs(DELTA) >= 3 ? DELTA * MIN : 0); H.textContent = 'S' + (i + 1) + ' · ' + place(a) + ' → ' + place(b); Pp.textContent = 'Km ' + km.toFixed(1) + ' of ' + R.routeKm.toFixed(1) + '. Next: ' + place(b) + ' at ' + (eta !== nextSt.arr ? 'about ' : '') + hm(eta) + ', in ' + dur(eta - t) + '.'; }
+  }
+  const showD = DELTA != null && plan.state !== 'pre' && plan.state !== 'done';
+  D.hidden = !showD;
+  if (showD) { D.className = 'delta ' + (DELTA >= 3 ? 'late' : DELTA <= -3 ? 'early' : ''); D.textContent = Math.abs(DELTA) < 3 ? 'On schedule' : Math.abs(DELTA) + ' min ' + (DELTA > 0 ? 'behind' : 'ahead of') + ' schedule'; }
+  const j = plan.state === 'done' ? null : JOINS.find(p => p.t > t && p.km > (plan.state === 'pre' ? -1 : PACKKM));
+  $('#joinNext').hidden = !j;
+  if (j) { $('#jnT').textContent = joinName(j); $('#jnW').textContent = fmt(j.id === 'A13' ? ST[j.i].dep : j.t); $('#joinNext').onclick = () => openPoint(j); }
+}
+const joinName = p => p.id === 'A13' ? 'Last 5 km · St-Sulpice' : p.name;
+
+let stripKey = '';
+function strip(plan) {
+  const key = RUN.map(r => r.src + (r.stale ? 's' : '') + r.km.toFixed(1)).join('|') + plan.state + VAN.map(v => vanLine(v)).join('|'); if (key === stripKey) return; stripKey = key;
+  const el = $('#strip');
+  if (!el.children.length) {
+    el.innerHTML = RUN.map(r => `<button type="button" data-r="${r.i}" aria-label="${esc(r.name)}"><img src="${r.thumb}" alt="" loading="lazy" width="46" height="46"><span>${esc(r.first)}<small></small></span></button>`).join('') +
+      VAN.map(v => `<button type="button" class="vn" data-v="${v.i}" aria-label="${esc(v.name)}"><i class="vi">${v.emoji || '🚐'}</i><span>${esc(v.name)}<small></small></span></button>`).join('');
+    el.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.r) { const r = RUN[b.dataset.r]; openRunner(r); if (r.ll) reveal(r.ll); } else { const v = VAN[b.dataset.v]; openVan(v); if (v.ll) reveal(v.ll); } };
+  }
+  [...el.children].forEach(b => { b.querySelector('small').textContent = b.dataset.r ? runnerLine(RUN[b.dataset.r], plan, true) : (VAN[b.dataset.v].ll ? vanLine(VAN[b.dataset.v]).split(' · ')[0] : 'No signal yet'); });
+}
+function runnerLine(r, plan, short) {
+  if (plan.state === 'pre') return short ? 'Full loop' : 'Runs the full loop. Starts ' + fmt(R.start) + '.';
+  if (plan.state === 'done' && r.src !== 'live') return 'Finished';
+  if (r.src === 'live') return r.stale ? 'Last seen ' + hm(r.ts) : 'Km ' + r.km.toFixed(1) + (short ? '' : ' · live · signal ' + hm(r.ts));
+  return 'Km ' + r.km.toFixed(1) + (short ? '' : ' · with the pack, by schedule');
+}
+
+/* ---------- pledges: live total from the main site's backend ---------- */
+let BOARD = null;
+function qrSvg(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); const n = q.getModuleCount(); let d = ''; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) d += `M${x} ${y}h1v1h-1z`; return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="QR code to the pledge form"><path fill="currentColor" d="${d}"/></svg>`; }
+const QR = typeof qrcode === 'function' ? qrSvg(CONFIG.pledgeUrl) : '';
+document.querySelectorAll('[data-qr]').forEach(e => e.innerHTML = QR);
+async function board() {
+  if (!CONFIG.pledgeEndpoint) return;
+  try { const r = await fetch(CONFIG.pledgeEndpoint + '?action=leaderboard', { cache: 'no-store' }); const j = await r.json(); if (!j.ok) throw 0; BOARD = j; } catch { return; }
+  const p = BOARD.totals && BOARD.totals.pledged;
+  if (p > 0) { $('#raiseL').textContent = 'Pledged so far'; $('#raiseB').textContent = chf(p); const s = $('#pledgeS'); s.hidden = false; s.textContent = chf(p) + ' pledged'; }
+  if (SEL === 'PLEDGE' && PANEL) PANEL();
+}
+function openPledge() {
+  const render = () => {
+    const tot = BOARD && BOARD.totals, groups = BOARD && BOARD.groups ? BOARD.groups.filter(g => g.pledged > 0).slice(0, 8) : [];
+    let h = `<h2>Pledge challenge</h2><p class="sub">Pledge for the loop. Pledges go to the Fondation Planètes Enfants Malades.</p>`;
+    if (tot && tot.pledged > 0) h += `<div class="figs ${tot.received > 0 ? 'two' : 'one'}"><div><span class="mono">Pledged so far</span><b>${chf(tot.pledged)}</b><small>live · updates every minute</small></div>${tot.received > 0 ? `<div><span class="mono">Received</span><b>${chf(tot.received)}</b><small>arrived so far</small></div>` : ''}</div>`;
+    else h += `<p class="note">The live total appears here as soon as it is available.</p>`;
+    h += `<div class="pledgeqr"><span class="qr">${QR}</span><div><b>Scan to pledge</b><p>Point your phone camera at the code. It opens the pledge form.</p></div></div>
+      <div class="acts"><a class="btn" href="${CONFIG.pledgeUrl}">Open the pledge form</a><a class="btn ghost" href="${CONFIG.site}#donate">Donate to the foundation</a></div>`;
+    if (groups.length) h += `<h3>Ranking</h3><ol class="board">${groups.map(g => `<li><span>${esc(g.name)}</span><b>${chf(g.pledged)}</b></li>`).join('')}</ol><div class="acts"><a class="btn ghost" href="${CONFIG.site}#pledge">Full ranking</a></div>`;
+    show('Pledge', h, 'PLEDGE', render);
+  };
+  render();
+}
+$('#pledge').onclick = openPledge; $('#raise').onclick = openPledge;
+
+/* ---------- partners ---------- */
+const logo = (name, file) => `<span class="lg" role="img" aria-label="${esc(name)}" style="--u:url(../assets/logos/${file}.png)"><img src="../assets/logos/${file}.png" alt=""></span>`;
+{ const sup = CONFIG.supporters.map(([n, f, u]) => u ? `<a href="${u}" target="_blank" rel="noopener" title="${esc(n)}">${logo(n, f)}</a>` : logo(n, f));
+  const main = CONFIG.mainPartners.map(p => `<a class="pm" href="${p.url}" target="_blank" rel="noopener" title="${esc(p.name)}"><span class="mono">Main partner</span>${logo(p.name, p.logo)}</a>`);
+  const per = Math.ceil(sup.length / (main.length * 2)); let one = '';
+  for (let i = 0, k = 0; i < sup.length; i += per, k++) one += main[k % main.length] + sup.slice(i, i + per).join('');
+  $('#pSupp').innerHTML = one + one.replace(/<a /g, '<a tabindex="-1" aria-hidden="true" '); }
+
+/* ---------- panel ---------- */
+let PANEL = null;
+const panel = $('#panel');
+function show(eyebrow, html, id, render) {
+  const b = $('#pB');
+  if (SEL === id && b._html === html) return false;
+  $('#pE').textContent = eyebrow; b.className = 'pb'; b.innerHTML = html; b._html = html;
+  if (SEL !== id) { b.scrollTop = 0; b.onclick = null; }
+  SEL = id; PANEL = render; panel.classList.add('open'); panel.setAttribute('aria-hidden', 'false');
+  [...POINTS, ...PLACES].forEach(p => { const el = p.m.getElement(); if (el) el.classList.toggle('sel', p.id === id); });
+  if (/^[A-Za-z0-9]+$/.test(id) && [...POINTS, ...PLACES].some(p => p.id === id)) history.replaceState(null, '', '#' + id);
+}
+function close() { if (!SEL) return; $('#pB')._html = null; panel.classList.remove('open'); panel.setAttribute('aria-hidden', 'true'); SEL = null; PANEL = null; [...POINTS, ...PLACES].forEach(p => { const el = p.m.getElement(); if (el) el.classList.remove('sel'); }); history.replaceState(null, '', location.pathname + location.search); zoomState(); declutter(); }
+$('#pX').onclick = close;
+addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+const dirs = p => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
+const welcome = `<p>You are welcome to run along or follow by bike.</p><p>Bring your reflective vest.</p>`;
+
+function status(p, t, plan) {
+  if (plan.state === 'pre') return ['Planned', false];
+  const ref = p.est || p.t, s = p.kind !== 'join' && p.i != null ? ST[p.i] : null;
+  if (s && s.arr && Math.abs(PACKKM - s.km) < .25 && t < s.dep + 5 * MIN && plan.state !== 'done') return ['Pack here now · departs ' + hm(s.dep), true];
+  if (plan.state === 'done' || p.km < PACKKM - .05) return ['Passed', false];
+  return ['Expected in ' + dur(ref - t), false];
+}
+const nearby = (km, self) => PLACES.filter(q => q.id !== self && !q.off && Math.abs(q.rkm - km) < 2.5).slice(0, 3);
+const nearHtml = list => list.length ? `<h3>Close by</h3><ul class="plist">${list.map(q => `<li><button type="button" data-p="${q.id}"><i class="vi">${q.emoji || '📍'}</i><span><b>${esc(q.name)}</b><small>${esc(q.tag)}</small></span></button></li>`).join('')}</ul>` : '';
+const nearClick = () => { $('#pB').onclick = e => { const b = e.target.closest('button[data-p]'); if (b) { const q = PLACES.find(x => x.id === b.dataset.p); openPlace(q); } }; };
+
+function openPoint(p, noPan) {
+  const render = () => {
+    const t = now(), plan = planAt(t), [stt, on] = status(p, t, plan);
+    let h = `<span class="state${on ? ' on' : ''}">${esc(stt)}</span>`;
+    if (p.kind === 'join') {
+      h += `<h2>${esc(p.name)}</h2><p class="sub">${p.toGo ? 'On the way from St-Sulpice to IMD.' : 'A point where runners join the pack.'}</p>
+        <div class="figs"><div><span class="mono">Pack passes</span><b>${hm(p.t)}</b><small>${day(p.t)}</small></div><div><span class="mono">Route km</span><b>${p.km.toFixed(1)}</b></div><div><span class="mono">To finish</span><b>${(R.routeKm - p.km).toFixed(1)}</b><small>km</small></div></div>`;
+      h += p.toGo ? `<div class="callout"><b>Join the last ${p.toGo} km</b>${welcome}</div>` : `<div class="callout"><b>Join here</b><p>Be there 10 minutes before the pack passes.</p>${isDark(p.t) ? '<p>It is dark at this time. Reflective vest and headlamp are required.</p>' : '<p>Bring your reflective vest.</p>'}</div>`;
+      h += `<p class="note">The pack can run a few minutes early or late. Watch the map.</p>`;
+    } else {
+      const s = ST[p.i], prev = ST[p.i - 1], next = ST[p.i + 1], start = s.id === 'START';
+      h += `<h2>${start ? 'IMD' : esc(s.id)}</h2><p class="sub">${start ? 'Start and finish · IMD campus, Chemin de Bellerive 23, Lausanne' : esc((s.sub || 'Aid station').replace(/^Regroup · /, '')) + (s.final ? ' · final aid station' : '')}</p>`;
+      h += start ? `<div class="figs"><div><span class="mono">Start</span><b>${hm(s.dep)}</b><small>Sat 28.11</small></div><div><span class="mono">Finish</span><b>${hm(FIN.arr)}</b><small>Sun 29.11</small></div><div><span class="mono">Loop</span><b>${R.routeKm.toFixed(1)}</b><small>km</small></div></div><p>Come to cheer the start on Saturday and the finish on Sunday. The pack runs the last 5 km together from St-Sulpice.</p>`
+        : `<div class="figs"><div><span class="mono">Arrive</span><b>${p.est ? '~' + hm(p.est) : hm(s.arr)}</b><small>${day(s.arr)}${p.est ? ' · plan ' + hm(s.arr) : ''}</small></div><div><span class="mono">Stop</span><b>${s.stop}</b><small>min</small></div><div><span class="mono">Depart</span><b>${hm(s.dep)}</b><small>fixed</small></div></div>`;
+      if (s.final) h += `<div class="callout"><b>Join the last 5 km</b><p>The pack regroups here and leaves together at ${hm(s.dep)} for IMD.</p>${welcome}</div>`;
+      h += '<ul class="rows">';
+      if (!start) h += `<li><span>Km</span><span>${s.km.toFixed(2)} of ${R.routeKm.toFixed(1)}</span></li>`;
+      if (prev) h += `<li><span>Section in</span><span>S${p.i} from ${place(prev)} · ${(s.km - prev.km).toFixed(1)} km · ${light(prev.dep, s.arr).toLowerCase()}</span></li>`;
+      if (next) h += `<li><span>Section out</span><span>S${p.i + 1} to ${place(next)} · ${(next.km - s.km).toFixed(1)} km · ${light(s.dep, next.arr).toLowerCase()}</span></li>`;
+      if (next) h += `<li><span>Next arrival</span><span>${place(next)} at ${fmt(next.arr)}</span></li>`;
+      const here = VAN.filter(v => v.ll && metres(v.ll[0], v.ll[1], s.lat, s.lon) < 400);
+      if (here.length) h += `<li><span>Vans here</span><span>${here.map(v => esc(v.name)).join(', ')}</span></li>`;
+      h += '</ul>';
+      if (!start) h += `<p class="note">Departure times are fixed. Arrival can move a few minutes either way.</p>`;
+    }
+    h += `<div class="acts"><a class="btn ghost" href="${dirs(p)}" target="_blank" rel="noopener">Directions</a><a class="btn ghost" href="${CONFIG.site}#run">Run with us</a></div>` + nearHtml(nearby(p.km));
+    if (show(p.kind === 'join' ? 'Join point' : p.kind === 'se' ? 'Start · finish' : 'Aid station', h, p.id, render) !== false) nearClick();
+  };
+  render(); if (!noPan) focus([p.lat, p.lon], p.km > 160 && p.id !== 'START' ? 13.75 : 11.5); declutter();
+}
+function openPlace(p, noPan) {
+  const render = () => {
+    const t = now(), plan = planAt(t), passed = plan.state === 'done' || (plan.state !== 'pre' && p.rkm < PACKKM - .05);
+    let h = `<span class="state${p.open === 'yes' ? ' ok' : ''}">${p.open === 'yes' ? 'Open on race weekend' : p.open === 'no' ? 'Closed when the pack passes' : p.off ? 'Off the route' : 'On the route'}</span>
+      <h2>${esc(p.name)} ${p.emoji || ''}</h2><p class="sub">${esc(p.tag)}</p>`;
+    if (!p.off) h += `<div class="figs"><div><span class="mono">Pack passes</span><b>${hm(p.t)}</b><small>${day(p.t)}${passed ? ' · passed' : ''}</small></div><div><span class="mono">Route km</span><b>${p.rkm.toFixed(1)}</b></div><div><span class="mono">To finish</span><b>${(R.routeKm - p.rkm).toFixed(1)}</b><small>km</small></div></div>`;
+    h += `<p>${esc(p.text)}</p>`;
+    if (p.last) h += `<div class="callout"><b>Last 5 km</b>${welcome}</div>`;
+    else if (!p.off) h += `<p class="note">${isDark(p.t) ? 'It is dark when the pack passes. Reflective vest and headlamp if you join.' : 'The pack can run a few minutes early or late. Watch the map.'}</p>`;
+    if (p.link) h += `<p class="note">Opening info checked on ${esc(window.PLACES_CHECKED || '')}. Confirm on <a href="${p.link}" target="_blank" rel="noopener">${esc(p.linkText || 'the official site')}</a> before you travel.</p>`;
+    h += `<div class="acts"><a class="btn ghost" href="${dirs(p)}" target="_blank" rel="noopener">Directions</a>${p.link ? `<a class="btn ghost" href="${p.link}" target="_blank" rel="noopener">Official site</a>` : ''}</div>` + nearHtml(nearby(p.rkm, p.id));
+    if (show('Along the route', h, p.id, render) !== false) nearClick();
+  };
+  render(); zoomState(); if (!noPan) focus([p.lat, p.lon], Math.max(12.75, p.zoom + 1)); declutter();
+}
+function openRunner(r) {
+  const render = () => {
+    const plan = planAt(now());
+    show('Runner · full loop', `<img class="photo" src="${r.full || r.thumb}" alt="${esc(r.name)}">
+      <span class="state${r.src === 'live' && !r.stale ? ' on' : ''}">${esc(runnerLine(r, plan))}</span>
+      <h2>${esc(r.name)}</h2><p>${esc(r.bio)}</p>
+      <div class="acts"><button class="btn" type="button" id="rPl">Pledge for the loop</button><a class="btn ghost" href="${CONFIG.site}#runners">Full story</a></div>`, 'R' + r.i, render);
+    const b = $('#rPl'); if (b) b.onclick = openPledge;
+  };
+  render();
+  if (!r.full) { const im = new Image(); im.onload = () => { r.full = r.photo; if (SEL === 'R' + r.i) render(); }; im.src = r.photo; }
+}
+function openVan(v) {
+  const render = () => show('Support van', `<span class="state${v.ll && !v.stale ? ' on' : ''}">${esc(vanLine(v))}</span><h2>${v.emoji || '🚐'} ${esc(v.name)}</h2><p class="sub">${esc(v.role)}</p>
+    <p>${v.ll ? 'The vans move between the aid stations with food, kit and first aid.' : 'This van shows on the map as soon as its GPS tracker is connected.'}</p>`, 'V' + v.i, render);
+  render();
+}
+function openList(rs, title) {
+  const render = () => {
+    const plan = planAt(now());
+    show(title, `<h2>${rs.length} runners</h2><p class="sub">${rs.length === RUN.length ? 'They run the full loop together.' : 'Together on this stretch.'}</p><ul class="plist">${rs.map(r => `<li><button type="button" data-i="${r.i}"><img src="${r.thumb}" alt="" width="52" height="52"><span><b>${esc(r.name)}</b><small>${esc(runnerLine(r, plan, true))}</small></span></button></li>`).join('')}</ul>
+      ${rs.length === RUN.length ? `<h3>Support vans</h3><ul class="plist">${VAN.map(v => `<li><button type="button" data-v="${v.i}"><i class="vi">${v.emoji || '🚐'}</i><span><b>${esc(v.name)}</b><small>${esc(vanLine(v))}</small></span></button></li>`).join('')}</ul>` : ''}
+      <div class="acts"><a class="btn ghost" href="${CONFIG.site}#runners">Runners & crew</a></div>`, 'LIST', render);
+    $('#pB').onclick = e => { const b = e.target.closest('button[data-i],button[data-v]'); if (!b || SEL !== 'LIST') return; if (b.dataset.i) { const r = RUN[b.dataset.i]; openRunner(r); if (r.ll) reveal(r.ll); } else { const v = VAN[b.dataset.v]; openVan(v); if (v.ll) reveal(v.ll); } };
+  };
+  render();
+}
+$('#allRunners').onclick = () => openList(RUN, 'Runners');
+
+// Poltrax iframe, if that is all the provider gives: set "poltrax" in race.js
+if (R.poltrax && /^https:\/\//.test(R.poltrax)) {
+  const b = document.createElement('button'); b.className = 'btn ghost'; b.type = 'button'; b.textContent = 'Satellite map';
+  b.onclick = () => { show('Poltrax · satellite trackers', '', 'SAT', null); const pb = $('#pB'); pb.className = 'pb frame'; pb.innerHTML = `<iframe src="${esc(R.poltrax)}" title="Live tracking" loading="lazy"></iframe>`; };
+  $('#allRunners').before(b);
+}
+
+/* ---------- night mode: follows daylight, button overrides ---------- */
+let nightPick = null, nightSet = null;
+function setNight(on) { nightSet = on; $('#sun').textContent = on ? '🌙' : '☀️'; document.documentElement.classList.toggle('night', on); $('#night').setAttribute('aria-pressed', on); $('#night').textContent = on ? 'Day' : 'Night'; paint(); horizon(); }
+$('#night').onclick = () => { nightPick = !document.documentElement.classList.contains('night'); setNight(nightPick); };
+function autoNight() { const want = nightPick ?? isDark(now()); if (want !== nightSet) setNight(want); }
+
+/* ---------- run ---------- */
+autoNight(); zoomState(); update();
+setInterval(() => { autoNight(); update(); }, DEMO ? 500 : 1000);
+poll(); setInterval(poll, DEMO ? 500 : CONFIG.pollSec * 1000);
+board(); setInterval(board, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { poll(); board(); } });
+// shared link to one point: …/live/#A4
+{ const id = location.hash.slice(1), p = id && [...POINTS, ...PLACES].find(x => x.id === id);
+  if (p) map.once('load', () => setTimeout(() => p.kind === 'poi' ? openPlace(p) : openPoint(p), 400)); }
+})();
+</script>
+</body>
+</html>
