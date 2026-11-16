@@ -510,10 +510,12 @@ let onlyMissing = false;
 function renderPeople() {
   const tb = $('#peopleTbl tbody'); if (!tb) return;
   const signed = (REMOTE && REMOTE.signed) || [];
-  const byRole = {}; signed.forEach(x => { const k = normName(x.role); if (!byRole[k] || x.t > byRole[k].t) byRole[k] = x; });
+  const byRole = {}, byName = {}, used = new Set();
+  const put = (m, k, x) => { if (k && k !== 'other' && (!m[k] || x.t > m[k].t)) m[k] = x; };
+  signed.forEach(x => { put(byRole, normName(x.role), x); put(byName, normName(x.name), x); });
   let s = 0, m = 0, f = 0; const missing = [];
   $$('tr', tb).forEach(tr => {
-    const n = tr.dataset.person, hit = byRole[normName(n)];
+    const n = tr.dataset.person, hit = byRole[normName(n)] || byName[normName(n)]; if (hit) used.add(hit);
     const w = $('.w', tr);
     if (!REMOTE) w.textContent = '—';
     else if (hit) { s++; w.innerHTML = `<span class="dot g"></span>${esc(fmt(hit.t))}<span class="sub">${esc(hit.name)} · ${esc(hit.page)}</span>`; }
@@ -523,6 +525,7 @@ function renderPeople() {
   });
   if (REMOTE) { $('#pSigned').textContent = s; $('#pMissing').textContent = m; $('#pForms').textContent = f + '/' + $$('#peopleTbl tr[data-runner]:not([data-runner=""])').length; const nt = $('#pNote'); if (nt) nt.hidden = true; }
   tb.dataset.missing = missing.join(', ');
+  const ex = $('#pExtra'); if (ex) { const seen = new Set(), list = signed.filter(x => !used.has(x) && !seen.has(normName(x.name)) && seen.add(normName(x.name)) && !signed.some(y => used.has(y) && (normName(y.name) === normName(x.name) || (normName(x.role) !== 'other' && normName(y.role) === normName(x.role))))); ex.hidden = !REMOTE || !list.length; ex.innerHTML = list.length ? '<b>Signed, not matched to the list:</b> ' + list.map(x => `<span class="dot g"></span>${esc(x.name)} <small>(${esc(x.page)}${x.role && x.role !== 'Other' ? ' · ' + esc(x.role) : ''} · ${esc(fmt(x.t))})</small>`).join(' &nbsp; ') : ''; }
 }
 
 const TPL = {
