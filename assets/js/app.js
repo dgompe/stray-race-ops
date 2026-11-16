@@ -518,10 +518,10 @@ function renderPeople() {
     if (!REMOTE) w.textContent = '—';
     else if (hit) { s++; w.innerHTML = `<span class="dot g"></span>${esc(fmt(hit.t))}<span class="sub">${esc(hit.name)} · ${esc(hit.page)}</span>`; }
     else { m++; missing.push(n); w.innerHTML = '<span class="dot r"></span><span>Not signed</span>'; }
-    if (tr.dataset.runner) { const ok = REMOTE && REMOTE.forms && REMOTE.forms.includes(n); if (ok) f++; $('.rf', tr).innerHTML = REMOTE ? (ok ? '<span class="dot g"></span><span>Received</span>' : '<span class="dot r"></span><span>Missing</span>') : '—'; }
+    if (tr.dataset.runner) { const ok = REMOTE && REMOTE.forms && REMOTE.forms.includes(tr.dataset.runner); if (ok) f++; $('.rf', tr).innerHTML = REMOTE ? (ok ? '<span class="dot g"></span><span>Received</span>' : '<span class="dot r"></span><span>Missing</span>') : '—'; }
     tr.hidden = onlyMissing && !!hit;
   });
-  if (REMOTE) { $('#pSigned').textContent = s; $('#pMissing').textContent = m; $('#pForms').textContent = f + '/' + PRIV.runners.length; const nt = $('#pNote'); if (nt) nt.hidden = true; }
+  if (REMOTE) { $('#pSigned').textContent = s; $('#pMissing').textContent = m; $('#pForms').textContent = f + '/' + $$('#peopleTbl tr[data-runner]:not([data-runner=""])').length; const nt = $('#pNote'); if (nt) nt.hidden = true; }
   tb.dataset.missing = missing.join(', ');
 }
 
