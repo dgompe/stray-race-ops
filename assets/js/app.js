@@ -505,6 +505,7 @@ function renderDash() {
   const wc = $('#waiverCount'); if (wc) wc.textContent = REMOTE && REMOTE.waivers != null ? `${REMOTE.waivers.total} total · ${REMOTE.waivers.runners} runners · ${REMOTE.waivers.relay} relay · ${REMOTE.waivers.crew} crew` : '—';
 }
 
+const ALIAS = { joe: 'ensa bajo' };
 const normName = s => String(s || '').replace(/\s*\(.*\)$/, '').trim().toLowerCase();
 let onlyMissing = false;
 function renderPeople() {
@@ -515,7 +516,7 @@ function renderPeople() {
   signed.forEach(x => { put(byRole, normName(x.role), x); put(byName, normName(x.name), x); });
   let s = 0, m = 0, f = 0; const missing = [];
   $$('tr', tb).forEach(tr => {
-    const n = tr.dataset.person, hit = byRole[normName(n)] || byName[normName(n)]; if (hit) used.add(hit);
+    const n = tr.dataset.person, hit = byRole[normName(n)] || byName[normName(n)] || byName[ALIAS[normName(n)]]; if (hit) used.add(hit);
     const w = $('.w', tr);
     if (!REMOTE) w.textContent = '—';
     else if (hit) { s++; w.innerHTML = `<span class="dot g"></span>${esc(fmt(hit.t))}<span class="sub">${esc(hit.name)} · ${esc(hit.page)}</span>`; }
