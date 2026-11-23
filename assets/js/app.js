@@ -515,8 +515,10 @@ function renderPeople() {
   const put = (m, k, x) => { if (k && k !== 'other' && (!m[k] || x.t > m[k].t)) m[k] = x; };
   signed.forEach(x => { put(byRole, normName(x.role), x); put(byName, normName(x.name), x); });
   let s = 0, m = 0, f = 0; const missing = [];
+  // Row "Adri Mosquera" matches signer "Adriana Mosquera Monge": every word of the row starts a word of the name. Only if exactly one signer fits.
+  const fuzzy = rn => { const w = rn.split(/\s+/).filter(Boolean); if (!w.length) return null; const c = Object.keys(byName).filter(k => { const t = k.split(/\s+/); return w.every(x => t.some(y => y.startsWith(x))); }); return c.length === 1 ? byName[c[0]] : null; };
   $$('tr', tb).forEach(tr => {
-    const n = tr.dataset.person, hit = byRole[normName(n)] || byName[normName(n)] || byName[ALIAS[normName(n)]]; if (hit) used.add(hit);
+    const n = tr.dataset.person, hit = byRole[normName(n)] || byName[normName(n)] || byName[ALIAS[normName(n)]] || fuzzy(normName(n)); if (hit) used.add(hit);
     const w = $('.w', tr);
     if (!REMOTE) w.textContent = '—';
     else if (hit) { s++; w.innerHTML = `<span class="dot g"></span>${esc(fmt(hit.t))}<span class="sub">${esc(hit.name)} · ${esc(hit.page)}</span>`; }
