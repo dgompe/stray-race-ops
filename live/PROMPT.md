@@ -15,7 +15,7 @@ Friends, family, donors and people who want to join along the route. They open i
 - One screen. The page never scrolls. The map fills it.
 - Top bar: STRAY logo, "Lake Tour Edition · Live", data status, race clock (countdown before the start), night toggle.
 - On the map: a "Now" card top left, layer switches bottom left, a "Pledged so far" card with a QR code bottom right (large screens).
-- Under the map: the eight runners with photos and the three vans, a "Runners" button, a "Make a pledge" button that carries the live total.
+- Under the map: the full-loop runners with photos and the three vans, a "Runners" button, a "Make a pledge" button that carries the live total.
 - Last row: partners, always moving.
 - Details open in a panel (right side on desktop, bottom sheet on phone). The panel may scroll inside. The page does not.
 - Spacing on a 4 · 8 · 12 · 16 · 24 scale. Nothing touches an edge or another element.
