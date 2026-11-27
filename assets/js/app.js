@@ -319,9 +319,13 @@ async function getRemote(action) {
 /* ---------- drivers: where to stop ----------
    A card that names a vehicle (Sprinter, Van A, Van B) or a driver role gets the list of
    aid stations with times and a navigation link. Stations named on the card are marked. */
+// Drivers per vehicle (race plan, Nov 2026). Their card gets the stop list even if it doesn't name the van.
+const DRIVERS = { 'hector gomez': 'Sprinter', 'thomas roos': 'Sprinter', 'christian morales': 'Van A', 'kate millican': 'Van A', 'edu diaz': 'Van B', 'pablo pinera': 'Van B' };
 function driveList(html, name) {
   const txt = String(html).replace(/<[^>]+>/g, ' ') + ' ' + (name || '');
-  const veh = (txt.match(/\b(Sprinter|Van A|Van B)\b/i) || [])[1];
+  const nn = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const known = Object.entries(DRIVERS).find(([k]) => k.split(' ').every(w => nn.includes(w)));
+  const veh = (known && known[1]) || (txt.match(/\b(Sprinter|Van A|Van B)\b/i) || [])[1];
   if (!veh && !/\bdriv/i.test(txt)) return '';
   const mine = new Set((txt.match(/\bA(?:1[0-3]|[1-9])\b/g) || []));
   const nav = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}&travelmode=driving`;
