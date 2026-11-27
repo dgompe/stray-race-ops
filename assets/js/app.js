@@ -316,34 +316,12 @@ async function getRemote(action) {
   const r = await fetch(u); return r.json();
 }
 
-/* ---------- drivers: where to stop ----------
-   A card that names a vehicle (Sprinter, Van A, Van B) or a driver role gets the list of
-   aid stations with times and a navigation link. Stations named on the card are marked. */
-// Drivers per vehicle (race plan, Nov 2026). Their card gets the stop list even if it doesn't name the van.
-const DRIVERS = { 'hector gomez': 'Sprinter', 'thomas roos': 'Sprinter', 'christian morales': 'Van A', 'kate millican': 'Van A', 'edu diaz': 'Van B', 'pablo pinera': 'Van B' };
-function driveList(html, name) {
-  const txt = String(html).replace(/<[^>]+>/g, ' ') + ' ' + (name || '');
-  const nn = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const known = Object.entries(DRIVERS).find(([k]) => k.split(' ').every(w => nn.includes(w)));
-  const veh = (known && known[1]) || (txt.match(/\b(Sprinter|Van A|Van B)\b/i) || [])[1];
-  if (!veh && !/\bdriv/i.test(txt)) return '';
-  const mine = new Set((txt.match(/\bA(?:1[0-3]|[1-9])\b/g) || []));
-  const nav = s => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}&travelmode=driving`;
-  const rows = ST.filter(s => s.id !== 'START').map(s => {
-    const name = s.id === 'FIN' ? 'Finish · IMD' : s.id + (s.sub ? ' · ' + s.sub.replace(/^Regroup · /, '') : '');
-    return `<tr${mine.has(s.id) ? ' style="background:var(--paper-2)"' : ''}><td><b>${esc(name)}</b>${mine.has(s.id) ? ' <span class="mono">on your card</span>' : ''}</td><td>${s.arr ? fmt(s.arr) : ''}</td><td>${s.dep ? fmt(s.dep) : ''}</td><td><a href="${nav(s)}" target="_blank" rel="noopener">Navigate</a></td></tr>`;
-  }).join('');
-  return `<div class="drive" style="margin-top:20px"><span class="mono">${veh ? esc(veh.replace(/^van/i, 'Van').replace(/^sprinter/i, 'Sprinter')) + ' · ' : ''}Where you stop</span>
-    <p class="note">Be at each stop before the pack arrives. Departure times are fixed. Navigate opens Google Maps with the route.</p>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Stop</th><th>Pack arrives</th><th>Pack leaves</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-}
-
 /* ---------- private: shared ---------- */
 function initPrivate(rec) {
   // personal card picker
   const pk = $('#picker');
   if (pk) {
-    const show = n => { const slot = $('#card'); slot.innerHTML = n && PRIV.cards[n] ? PRIV.cards[n] + driveList(PRIV.cards[n], n) : '<p class="note">Pick your name to see your card.</p>'; store.set('stray-pick-' + PAGE, n); syncStationFromPick(n); };
+    const show = n => { const slot = $('#card'); slot.innerHTML = n && PRIV.cards[n] ? PRIV.cards[n] : '<p class="note">Pick your name to see your card.</p>'; store.set('stray-pick-' + PAGE, n); syncStationFromPick(n); };
     pk.addEventListener('change', () => show(pk.value));
     const pre = store.get('stray-pick-' + PAGE) || (rec && rec.role !== 'Other' ? rec.role : '');
     if (pre && PRIV.cards[pre]) { pk.value = pre; show(pre); }
