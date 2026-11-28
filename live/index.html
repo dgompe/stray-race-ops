@@ -389,8 +389,8 @@ const CONFIG = {
     { name: 'Clarinde Esculier', img: 'clarinde-esculier.jpg', tracker: '', bio: 'I grew up across three continents and trained as a doctor. Wherever life has taken me, the mountains and nature have been a place where I find peace and reconnect with myself.' },
     { name: 'Arthur Wong', img: 'arthur-wong.jpg', tracker: '', bio: 'I used to run to get more in touch with myself. Listening, having conversations between the heart, the body and the mind: a status check, a detox, a fitness enhancement. One runs quick, but time slows down. I still do that today.' },
     { name: 'Marthinus Erasmus', img: 'marthinus-erasmus.jpg', tracker: '', bio: 'This year I signed up for the Stray 100, a 100-mile race around Lake Geneva. I always knew a 100-miler in one go was in my future. I just didn’t expect it to be this year, because twelve months ago I couldn’t run at all.' },
-    { name: 'Antoine', img: 'antoine.jpg', tracker: '', bio: 'Ever since I moved to the Alps, I’ve wanted to run all the way around Lake Geneva. This event gives me a reason to finally do it and a cause to run for.' },
-    { name: 'Antoine Clément', img: 'antoine-clement.jpg', tracker: '', bio: 'Mount to Coast Athlete. Ever since I moved to the Alps, I’ve wanted to run all the way around Lake Geneva. This event gives me a reason to finally do it and a cause to run for.' },
+    { name: 'Sheng Li', img: '', tracker: '7', bio: 'Running the full loop around Lake Geneva.' },
+    { name: 'Antoine Clément', img: 'antoine.jpg', tracker: '', bio: 'Mount to Coast Athlete. Ever since I moved to the Alps, I’ve wanted to run all the way around Lake Geneva. This event gives me a reason to finally do it and a cause to run for.' },
   ],
   vehicles: [
     { name: 'Sprinter', emoji: '🚐', tracker: '', role: 'Race van' },
@@ -678,7 +678,8 @@ if (!CALM) setInterval(() => {
 }, 12000);
 
 /* ---------- runners and vans: live feed, or plan when there is none ---------- */
-const RUN = CONFIG.runners.map((r, i) => ({ ...r, i, first: r.name.split(' ')[0], thumb: 'runners/' + r.img, photo: CONFIG.photos + r.img, km: 0, ll: null, src: 'plan', ts: 0 }));
+const initialsPic = n => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#2e2452"/><text x="48" y="60" font-family="Arial,sans-serif" font-size="36" font-weight="700" fill="#f6efe9" text-anchor="middle">${n.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</text></svg>`);
+const RUN = CONFIG.runners.map((r, i) => ({ ...r, i, first: r.name.split(' ')[0], thumb: r.img ? 'runners/' + r.img : initialsPic(r.name), photo: r.img ? CONFIG.photos + r.img : '', km: 0, ll: null, src: 'plan', ts: 0 }));
 const VAN = CONFIG.vehicles.map((v, i) => ({ ...v, i, ll: null, ts: 0, stale: false }));
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 let FEED = { ok: false, at: 0, rows: [] };
@@ -955,7 +956,7 @@ function openRunner(r) {
     const b = $('#rPl'); if (b) b.onclick = openPledge;
   };
   render();
-  if (!r.full) { const im = new Image(); im.onload = () => { r.full = r.photo; if (SEL === 'R' + r.i) render(); }; im.src = r.photo; }
+  if (!r.full && r.photo) { const im = new Image(); im.onload = () => { r.full = r.photo; if (SEL === 'R' + r.i) render(); }; im.src = r.photo; }
 }
 function openVan(v) {
   const render = () => show('Support van', `<span class="state${v.ll && !v.stale ? ' on' : ''}">${esc(vanLine(v))}</span><h2>${v.emoji || '🚐'} ${esc(v.name)}</h2><p class="sub">${esc(v.role)}</p>
